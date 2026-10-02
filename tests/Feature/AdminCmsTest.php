@@ -14,7 +14,8 @@ it('forbids non-admin users from the admin area', function () {
 
 it('creates a product with ordered uploaded images and variants', function () {
     Storage::fake('public');
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
     $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
 
     $response = $this->actingAs($admin)->post(route('admin.products.store'), [
@@ -38,7 +39,8 @@ it('creates a product with ordered uploaded images and variants', function () {
 });
 
 it('restores order stock only once when rejecting an order', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
     $buyer = User::factory()->create();
     $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
     $product = Product::query()->create([
@@ -65,7 +67,8 @@ it('restores order stock only once when rejecting an order', function () {
 
 it('updates the home hero image and tagline', function () {
     Storage::fake('public');
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
 
     $this->actingAs($admin)->put(route('admin.home-settings.update'), [
         'tagline' => 'Wear your point of view.',

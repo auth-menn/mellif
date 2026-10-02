@@ -24,6 +24,12 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'mellif' => [
+        'admin_email' => env('ADMIN_EMAIL'),
+        'admin_password' => env('ADMIN_PASSWORD'),
+        'demo_password' => env('DEMO_PASSWORD'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
