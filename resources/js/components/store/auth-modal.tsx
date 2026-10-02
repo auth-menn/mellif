@@ -1,9 +1,10 @@
 import { router } from '@inertiajs/react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { store as loginStore } from '@/routes/login';
 import { store as registerStore } from '@/routes/register';
 import { redirect as googleRedirect } from '@/routes/google';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { mergeGuestCart } from '@/lib/cart-api';
 
 type AuthMode = 'login' | 'register';
 type AuthResponse = { message?: string; errors?: Record<string, string[]> };
@@ -23,14 +24,28 @@ export default function AuthModal({ open, onOpenChange, onAuthenticated }: { ope
     const [message, setMessage] = useState('');
     const [processing, setProcessing] = useState(false);
 
+    const finishAuthentication = useCallback(async (): Promise<void> => {
+        try {
+            await mergeGuestCart();
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : 'Keranjang gagal digabungkan.');
+            return;
+        }
+        router.reload({ only: ['auth'], onSuccess: () => {
+            window.dispatchEvent(new Event('mellif-cart-updated'));
+            onOpenChange(false);
+            onAuthenticated?.();
+        } });
+    }, [onAuthenticated, onOpenChange]);
+
     useEffect(() => {
         const handlePopupAuth = (event: MessageEvent<unknown>): void => {
             if (event.origin !== window.location.origin || !event.data || typeof event.data !== 'object' || !('type' in event.data) || event.data.type !== 'mellif-auth-complete') return;
-            router.reload({ only: ['auth'], onSuccess: () => { onOpenChange(false); onAuthenticated?.(); } });
+            void finishAuthentication();
         };
         window.addEventListener('message', handlePopupAuth);
         return () => window.removeEventListener('message', handlePopupAuth);
-    }, [onAuthenticated, onOpenChange]);
+    }, [finishAuthentication]);
 
     const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
@@ -61,7 +76,7 @@ export default function AuthModal({ open, onOpenChange, onAuthenticated }: { ope
                 }
                 return;
             }
-            router.reload({ only: ['auth'], onSuccess: () => { onOpenChange(false); onAuthenticated?.(); } });
+            await finishAuthentication();
         } catch {
             setMessage('Koneksi gagal. Coba lagi.');
         } finally {

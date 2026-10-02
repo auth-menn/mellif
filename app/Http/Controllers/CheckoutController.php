@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PlaceOrderRequest;
+use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\ProductVariant;
@@ -59,6 +60,10 @@ class CheckoutController extends Controller
                     'qty' => $quantity, 'unit_price' => $variant->product->discounted_price,
                 ]);
             }
+
+            CartItem::query()->whereBelongsTo($request->user())
+                ->whereIn('product_variant_id', $lockedVariants->map(fn (array $line): int => $line[0]->id))
+                ->delete();
 
             return $order;
         });

@@ -31,7 +31,7 @@ class PlaceOrderRequest extends FormRequest
             'payment_method_id' => ['required', 'exists:payment_methods,id'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
-            'items.*.qty' => ['required', 'integer', 'min:1', 'max:20'],
+            'items.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
         ];
     }
 }

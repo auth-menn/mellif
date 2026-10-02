@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Product;
@@ -39,6 +40,7 @@ it('creates an order with server prices and reduces locked variant stock', funct
         'is_active' => true,
     ]);
     $variant = ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'M', 'stock' => 4]);
+    CartItem::query()->create(['user_id' => $user->id, 'product_variant_id' => $variant->id, 'quantity' => 2]);
     $courier = ShippingCourier::query()->create(['name' => 'JNE', 'code' => 'jne', 'flat_cost' => 18000, 'is_active' => true]);
     $payment = PaymentMethod::query()->create(['name' => 'QRIS', 'code' => 'qris', 'is_active' => true]);
 
@@ -54,6 +56,7 @@ it('creates an order with server prices and reduces locked variant stock', funct
     $this->assertDatabaseHas('orders', ['user_id' => $user->id, 'subtotal' => 300000, 'shipping_cost' => 18000, 'total' => 318000]);
     $this->assertDatabaseHas('order_items', ['product_id' => $product->id, 'qty' => 2, 'unit_price' => 150000]);
     expect($variant->fresh()->stock)->toBe(2);
+    expect($user->cartItems()->count())->toBe(0);
 });
 
 it('rejects checkout when requested quantity exceeds current stock', function () {

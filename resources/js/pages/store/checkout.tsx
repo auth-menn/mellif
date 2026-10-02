@@ -6,35 +6,47 @@ import { store as placeOrder } from '@/routes/checkout';
 import { login } from '@/routes';
 import { index as shopIndex } from '@/routes/shop';
 import AuthModal from '@/components/store/auth-modal';
+import { loadServerCart, mergeGuestCart, readGuestCart, setServerCart } from '@/lib/cart-api';
 
 type Courier = { id: number; name: string; flat_cost: number };
 type PaymentMethod = { id: number; name: string };
 
 export default function Checkout({ couriers, paymentMethods, orderNumber }: { couriers: Courier[]; paymentMethods: PaymentMethod[]; orderNumber: string | null }) {
     const { props } = usePage();
-    const user = (props.auth as { user?: { name: string; phone?: string | null } | null } | undefined)?.user;
+    const user = (props.auth as { user?: { id: number; name: string; phone?: string | null } | null } | undefined)?.user;
     const [cart, setCart] = useState<CartLine[]>([]);
     const [courierId, setCourierId] = useState(couriers[0]?.id ?? 0);
     const [paymentId, setPaymentId] = useState(paymentMethods[0]?.id ?? 0);
     const [form, setForm] = useState({ recipient_name: user?.name ?? '', phone: user?.phone ?? '', address: '', address_detail: '' });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [authOpen, setAuthOpen] = useState(false);
+    const [cartMessage, setCartMessage] = useState('');
 
     useEffect(() => {
-        try {
-            const value: unknown = JSON.parse(localStorage.getItem('mellif-cart') ?? '[]');
-            setCart(Array.isArray(value) ? value as CartLine[] : []);
-        } catch {
-            setCart([]);
-        }
-    }, []);
+        let active = true;
+        const loadCart = async (): Promise<void> => {
+            if (user) {
+                await mergeGuestCart();
+                const items = await loadServerCart();
+                if (active) setCart(items);
+                return;
+            }
+            if (active) setCart(readGuestCart());
+        };
+        void loadCart().catch(() => setCartMessage('Keranjang gagal dimuat. Muat ulang halaman untuk mencoba lagi.'));
+        return () => { active = false; };
+    }, [user?.id]);
 
     const subtotal = cart.reduce((sum, line) => sum + line.product.discounted_price * line.quantity, 0);
     const shipping = couriers.find((courier) => courier.id === courierId)?.flat_cost ?? 0;
     const updateCart = (next: CartLine[]): void => {
         setCart(next);
-        localStorage.setItem('mellif-cart', JSON.stringify(next));
-        window.dispatchEvent(new Event('mellif-cart-updated'));
+        if (user) {
+            void setServerCart(next).catch((error: unknown) => setCartMessage(error instanceof Error ? error.message : 'Keranjang gagal diperbarui.'));
+        } else {
+            localStorage.setItem('mellif-cart', JSON.stringify(next));
+            window.dispatchEvent(new Event('mellif-cart-updated'));
+        }
     };
     const submitOrder = (): void => {
         setErrors({});
@@ -63,5 +75,5 @@ export default function Checkout({ couriers, paymentMethods, orderNumber }: { co
 
     if (orderNumber) return <><Head title="Order diterima — Mellif" /><main className="mx-auto min-h-screen max-w-3xl px-6 pb-20 pt-40 text-center"><p className="text-xs uppercase tracking-[.25em] text-neutral-500">Pesanan diterima</p><h1 className="mt-5 text-4xl font-medium">Terima kasih sudah berbelanja.</h1><p className="mt-5 text-neutral-600">Nomor order Anda</p><p className="mt-2 text-xl font-semibold">{orderNumber}</p><p className="mx-auto mt-8 max-w-xl text-sm leading-6 text-neutral-500">Pembayaran QRIS dan unggah bukti pembayaran akan tersedia pada fase berikutnya.</p><Link href={shopIndex.url()} className="mt-8 inline-block bg-black px-8 py-4 text-sm text-white">Lanjut belanja</Link></main></>;
 
-    return <><Head title="Checkout — Mellif" /><main className="mx-auto min-h-screen max-w-6xl px-5 pb-20 pt-28"><h1 className="mb-8 text-3xl font-medium">Checkout</h1><div className="grid gap-10 md:grid-cols-[1.3fr_.7fr]"><section className="space-y-5"><h2 className="text-lg font-medium">Data penerima</h2>{([['recipient_name', 'Nama penerima'], ['phone', 'Nomor HP'], ['address', 'Alamat'], ['address_detail', 'Detail alamat (opsional)']] as const).map(([key, label]) => <label key={key} className="block text-sm">{label}{key.includes('address') ? <textarea value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className="mt-2 min-h-20 w-full border border-neutral-300 p-3" /> : <input value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className="mt-2 w-full border border-neutral-300 px-3 py-3" />}{errors[key] && <span className="mt-1 block text-xs text-red-600">{errors[key]}</span>}</label>)}<label className="block text-sm">Ekspedisi<select value={courierId} onChange={(event) => setCourierId(Number(event.target.value))} className="mt-2 w-full border border-neutral-300 px-3 py-3">{couriers.map((courier) => <option key={courier.id} value={courier.id}>{courier.name} · {money(courier.flat_cost)}</option>)}</select></label><label className="block text-sm">Metode pembayaran<select value={paymentId} onChange={(event) => setPaymentId(Number(event.target.value))} className="mt-2 w-full border border-neutral-300 px-3 py-3">{paymentMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}</select></label></section><aside className="h-fit border border-neutral-200 p-5"><h2 className="mb-5 text-lg font-medium">Ringkasan pesanan</h2>{cart.length === 0 ? <p className="py-4 text-sm text-neutral-500">Keranjang Anda kosong. <Link className="underline" href={shopIndex.url()}>Pilih produk</Link></p> : <div className="space-y-4">{cart.map((line) => <div key={line.variant.id} className="flex items-start justify-between gap-3 text-sm"><div><p>{line.product.name}</p><p className="text-xs text-neutral-500">Size {line.variant.size} · {money(line.product.discounted_price)}</p><div className="mt-1 flex items-center gap-2"><button aria-label="Kurangi jumlah" onClick={() => updateCart(cart.map((item) => item.variant.id === line.variant.id ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item))}>−</button><span>{line.quantity}</span><button aria-label="Tambah jumlah" onClick={() => updateCart(cart.map((item) => item.variant.id === line.variant.id ? { ...item, quantity: Math.min(item.variant.stock, item.quantity + 1) } : item))}>+</button><button className="ml-2 text-xs underline" onClick={() => updateCart(cart.filter((item) => item.variant.id !== line.variant.id))}>Hapus</button></div></div><span>{money(line.product.discounted_price * line.quantity)}</span></div>)}</div>}<div className="mt-6 space-y-3 border-t pt-4 text-sm"><p className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></p><p className="flex justify-between"><span>Pengiriman</span><span>{money(shipping)}</span></p><p className="flex justify-between border-t pt-3 font-semibold"><span>Total</span><span>{money(subtotal + shipping)}</span></p></div><button disabled={!cart.length} onClick={submit} className="mt-5 w-full bg-black py-4 text-sm font-medium text-white disabled:opacity-40">Order Sekarang</button></aside></div></main><AuthModal open={authOpen} onOpenChange={setAuthOpen} onAuthenticated={submitOrder} /></>;
+    return <><Head title="Checkout — Mellif" /><main className="mx-auto min-h-screen max-w-6xl px-5 pb-20 pt-28"><h1 className="mb-8 text-3xl font-medium">Checkout</h1><div className="grid gap-10 md:grid-cols-[1.3fr_.7fr]"><section className="space-y-5"><h2 className="text-lg font-medium">Data penerima</h2>{([['recipient_name', 'Nama penerima'], ['phone', 'Nomor HP'], ['address', 'Alamat'], ['address_detail', 'Detail alamat (opsional)']] as const).map(([key, label]) => <label key={key} className="block text-sm">{label}{key.includes('address') ? <textarea value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className="mt-2 min-h-20 w-full border border-neutral-300 p-3" /> : <input value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className="mt-2 w-full border border-neutral-300 px-3 py-3" />}{errors[key] && <span className="mt-1 block text-xs text-red-600">{errors[key]}</span>}</label>)}<label className="block text-sm">Ekspedisi<select value={courierId} onChange={(event) => setCourierId(Number(event.target.value))} className="mt-2 w-full border border-neutral-300 px-3 py-3">{couriers.map((courier) => <option key={courier.id} value={courier.id}>{courier.name} · {money(courier.flat_cost)}</option>)}</select></label><label className="block text-sm">Metode pembayaran<select value={paymentId} onChange={(event) => setPaymentId(Number(event.target.value))} className="mt-2 w-full border border-neutral-300 px-3 py-3">{paymentMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}</select></label></section><aside className="h-fit border border-neutral-200 p-5"><h2 className="mb-5 text-lg font-medium">Ringkasan pesanan</h2>{cartMessage && <p role="alert" className="mb-4 text-sm text-red-700">{cartMessage}</p>}{cart.length === 0 ? <p className="py-4 text-sm text-neutral-500">Keranjang Anda kosong. <Link className="underline" href={shopIndex.url()}>Pilih produk</Link></p> : <div className="space-y-4">{cart.map((line) => <div key={line.variant.id} className="flex items-start justify-between gap-3 text-sm"><div><p>{line.product.name}</p><p className="text-xs text-neutral-500">Size {line.variant.size} · {money(line.product.discounted_price)}</p><div className="mt-1 flex items-center gap-2"><button aria-label="Kurangi jumlah" onClick={() => updateCart(cart.map((item) => item.variant.id === line.variant.id ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item))}>−</button><span>{line.quantity}</span><button aria-label="Tambah jumlah" onClick={() => updateCart(cart.map((item) => item.variant.id === line.variant.id ? { ...item, quantity: Math.min(item.variant.stock, item.quantity + 1) } : item))}>+</button><button className="ml-2 text-xs underline" onClick={() => updateCart(cart.filter((item) => item.variant.id !== line.variant.id))}>Hapus</button></div></div><span>{money(line.product.discounted_price * line.quantity)}</span></div>)}</div>}<div className="mt-6 space-y-3 border-t pt-4 text-sm"><p className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></p><p className="flex justify-between"><span>Pengiriman</span><span>{money(shipping)}</span></p><p className="flex justify-between border-t pt-3 font-semibold"><span>Total</span><span>{money(subtotal + shipping)}</span></p></div><button disabled={!cart.length} onClick={submit} className="mt-5 w-full bg-black py-4 text-sm font-medium text-white disabled:opacity-40">Order Sekarang</button></aside></div></main><AuthModal open={authOpen} onOpenChange={setAuthOpen} onAuthenticated={submitOrder} /></>;
 }

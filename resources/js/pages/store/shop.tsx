@@ -1,16 +1,19 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Filter, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import ProductCard from '@/components/store/product-card';
 import type { Product, StoreVariant } from '@/types/store';
 import { money } from '@/types/store';
 import { index as shopIndex } from '@/routes/shop';
+import { saveCartLine } from '@/lib/cart-api';
 
 type Category = { id: number; name: string };
 type Page<T> = { data: T[]; links: { url: string | null; label: string; active: boolean }[]; total: number };
 type Filters = { q?: string; categories?: string; type?: string; in_stock?: string; min?: string; max?: string; sort?: string };
 
 export default function Shop({ products, categories, filters }: { products: Page<Product>; categories: Category[]; filters: Filters }) {
+    const { props } = usePage();
+    const user = (props.auth as { user?: { id: number } | null } | undefined)?.user;
     const [query, setQuery] = useState(filters.q ?? '');
     const [selectedCategories, setSelectedCategories] = useState<string[]>(filters.categories?.split(',').filter(Boolean) ?? []);
     const [buyProduct, setBuyProduct] = useState<Product | null>(null);
@@ -34,15 +37,10 @@ export default function Shop({ products, categories, filters }: { products: Page
 
     const totalPages = useMemo(() => products.links.filter((link) => /^\d+$/.test(link.label)).length, [products.links]);
 
-    const addToCart = (): void => {
+    const addToCart = async (): Promise<void> => {
         if (!buyProduct || !selectedSize) return;
         try {
-            const cart: { product: Product; variant: StoreVariant; quantity: number }[] = JSON.parse(localStorage.getItem('mellif-cart') ?? '[]');
-            const existing = cart.find((line) => line.variant.id === selectedSize.id);
-            if (existing) existing.quantity = Math.min(selectedSize.stock, existing.quantity + quantity);
-            else cart.push({ product: buyProduct, variant: selectedSize, quantity });
-            localStorage.setItem('mellif-cart', JSON.stringify(cart));
-            window.dispatchEvent(new Event('mellif-cart-updated'));
+            await saveCartLine(buyProduct, selectedSize, quantity, Boolean(user));
             setNotice('Ditambahkan ke keranjang');
             setBuyProduct(null);
             setSelectedSize(null);
