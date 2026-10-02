@@ -12,17 +12,47 @@ import { useTranslation } from '@/hooks/use-translation';
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
     const { url, props } = usePage();
-    const isHome = url === '/';
+    const isHome = url.split('?')[0] === '/';
     const user = (props.auth as { user?: { id: number; name: string } | null } | undefined)?.user;
     const [menuOpen, setMenuOpen] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
     const [authOpen, setAuthOpen] = useState(false);
     const [accountOpen, setAccountOpen] = useState(false);
+    const [homeScrolled, setHomeScrolled] = useState(false);
+    const [languageOpen, setLanguageOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
     const [cart, setCart] = useState<CartLine[]>([]);
     const userRef = useRef(user);
     userRef.current = user;
     const { language, setLanguage, t } = useTranslation();
+
+    useEffect(() => {
+        if (!isHome) {
+            setHomeScrolled(false);
+
+            return;
+        }
+
+        let animationFrame = 0;
+        const updateScrollState = (): void => {
+            if (animationFrame !== 0) {
+                return;
+            }
+
+            animationFrame = window.requestAnimationFrame(() => {
+                animationFrame = 0;
+                setHomeScrolled(window.scrollY > 12);
+            });
+        };
+
+        updateScrollState();
+        window.addEventListener('scroll', updateScrollState, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', updateScrollState);
+            window.cancelAnimationFrame(animationFrame);
+        };
+    }, [isHome]);
 
     useEffect(() => {
         let active = true;
@@ -47,29 +77,42 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             if (event.key === 'Escape') {
                 setMenuOpen(false);
                 setCartOpen(false);
+                setLanguageOpen(false);
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
-    const changeLanguage = (): void => setLanguage(language === 'ID' ? 'EN' : 'ID');
+    const selectLanguage = (selectedLanguage: 'ID' | 'EN'): void => {
+        setLanguage(selectedLanguage);
+        setLanguageOpen(false);
+    };
 
     return (
         <div className="min-h-screen bg-white text-[#171815]">
-            <header className={`fixed inset-x-0 top-0 z-40 h-[72px] ${isHome ? 'bg-black/10 text-white' : 'bg-black text-white'}`}>
-                <div className="mx-auto grid h-full max-w-[1800px] grid-cols-3 items-center px-5 md:px-8">
-                    <button aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(true)} className="w-fit p-2"><Menu size={25} strokeWidth={1.6} /></button>
-                    <Link href="/" className="justify-self-center text-2xl font-black tracking-[0.18em]">MELLIF</Link>
-                    <div className="flex items-center justify-self-end gap-3 md:gap-5">
-                        <button onClick={changeLanguage} aria-label={t('nav.language')} className="flex items-center gap-1 text-xs"><span aria-hidden="true">🇮🇩</span><span>{language}</span></button>
-                        <Link href={shopIndex.url()} aria-label={t('nav.search')} className="p-1"><Search size={22} strokeWidth={1.6} /></Link>
-                        <button onClick={() => setCartOpen(true)} aria-label={`${t('nav.cart')}, ${cartCount} ${t('cart.quantity').toLowerCase()}`} className="relative p-1"><ShoppingBag size={22} strokeWidth={1.6} />{cartCount > 0 && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">{cartCount}</span>}</button>
-                        {user ? <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen} aria-label={t('nav.account')} className="p-1"><UserRound size={22} strokeWidth={1.6} /></button> : <button onClick={() => setAuthOpen(true)} aria-label={t('nav.login')} className="p-1"><UserRound size={22} strokeWidth={1.6} /></button>}
+            <header className={`fixed z-40 transition-all duration-300 ease-out ${isHome ? homeScrolled ? 'left-1/2 right-auto top-3 h-12 w-[calc(100%-32px)] max-w-[1800px] -translate-x-1/2 rounded-2xl border border-white/40 bg-white/65 text-[#171815] shadow-lg shadow-black/10 backdrop-blur-xl md:h-14' : 'inset-x-0 top-0 h-14 bg-white/95 text-[#171815] md:h-16' : 'inset-x-0 top-0 h-14 bg-black text-white md:h-16'}`}>
+                <div className="mx-auto grid h-full max-w-[1800px] grid-cols-3 items-center px-4 md:px-7">
+                    <button aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(true)} className="w-fit p-1.5"><Menu size={24} strokeWidth={1.5} /></button>
+                    <Link href="/" className="justify-self-center text-xl font-medium tracking-[0.16em]">MELLIF</Link>
+                    <div className="flex items-center justify-self-end gap-2.5 md:gap-4">
+                        <div className="relative">
+                            <button type="button" onClick={() => setLanguageOpen(!languageOpen)} aria-label={t('nav.language')} aria-expanded={languageOpen} title={t('nav.language')} className="flex items-center gap-1.5 px-1.5 py-1 text-sm">
+                                <span aria-hidden="true">{language === 'EN' ? '🇬🇧' : '🇮🇩'}</span><span>{language}</span>
+                            </button>
+                            {languageOpen && <div className="absolute right-0 top-full z-50 mt-3 w-52 rounded-xl border border-white/70 bg-white/85 p-2 text-sm text-neutral-900 shadow-xl backdrop-blur-xl" role="menu" aria-label={t('nav.language')}>
+                                <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('nav.language')}</p>
+                                <button type="button" role="menuitemradio" aria-checked={language === 'ID'} onClick={() => selectLanguage('ID')} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/60 ${language === 'ID' ? 'font-semibold' : ''}`}><span>🇮🇩&nbsp; Bahasa Indonesia</span>{language === 'ID' && <span aria-hidden="true">✓</span>}</button>
+                                <button type="button" role="menuitemradio" aria-checked={language === 'EN'} onClick={() => selectLanguage('EN')} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/60 ${language === 'EN' ? 'font-semibold' : ''}`}><span>🇬🇧&nbsp; English</span>{language === 'EN' && <span aria-hidden="true">✓</span>}</button>
+                            </div>}
+                        </div>
+                        <Link href={shopIndex.url()} aria-label={t('nav.search')} className="p-1"><Search size={24} strokeWidth={1.5} /></Link>
+                        <button onClick={() => setCartOpen(true)} aria-label={`${t('nav.cart')}, ${cartCount} ${t('cart.quantity').toLowerCase()}`} className="relative p-1"><ShoppingBag size={24} strokeWidth={1.5} />{cartCount > 0 && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">{cartCount}</span>}</button>
+                        {user ? <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen} aria-label={t('nav.account')} className="p-1"><UserRound size={24} strokeWidth={1.5} /></button> : <button onClick={() => setAuthOpen(true)} aria-label={t('nav.login')} className="p-1"><UserRound size={24} strokeWidth={1.5} /></button>}
                     </div>
                 </div>
             </header>
-            {user && accountOpen && <div className="fixed right-5 top-[64px] z-50 min-w-52 border bg-white p-4 text-sm text-black shadow-lg"><p className="font-medium">{user.name}</p><Link href="/dashboard" onClick={() => setAccountOpen(false)} className="mt-3 block py-2">{t('nav.myOrders')}</Link><Link href={logout.url()} method="post" as="button" className="w-full border-t pt-3 text-left text-red-700">{t('nav.logout')}</Link></div>}
+            {user && accountOpen && <div className="fixed right-5 top-[64px] z-50 min-w-52 rounded-xl border border-white/70 bg-white/85 p-4 text-sm text-black shadow-lg backdrop-blur-xl"><p className="font-medium">{user.name}</p><Link href="/dashboard" onClick={() => setAccountOpen(false)} className="mt-3 block py-2">{t('nav.myOrders')}</Link><Link href={logout.url()} method="post" as="button" className="w-full pt-3 text-left text-red-700">{t('nav.logout')}</Link></div>}
             {children}
             {(menuOpen || cartOpen) && <button aria-label={t('nav.closePanel')} className="fixed inset-0 z-50 bg-black/45" onClick={() => { setMenuOpen(false); setCartOpen(false); }} />}
             <aside className={`fixed inset-y-0 left-0 z-[51] w-[min(360px,86vw)] bg-white p-7 text-black shadow-xl transition-transform ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!menuOpen}>
