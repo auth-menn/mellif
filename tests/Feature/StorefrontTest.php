@@ -8,6 +8,20 @@ use App\Models\ProductVariant;
 use App\Models\ShippingCourier;
 use App\Models\User;
 
+it('shares a valid English locale cookie with Inertia pages', function () {
+    $this->withUnencryptedCookie('locale', 'en')
+        ->get(route('home'))
+        ->assertInertia(fn ($page) => $page->where('locale', 'en'))
+        ->assertSee('<html lang="en"', false);
+});
+
+it('falls back to Indonesian for an invalid locale cookie', function () {
+    $this->withUnencryptedCookie('locale', 'fr')
+        ->get(route('home'))
+        ->assertInertia(fn ($page) => $page->where('locale', 'id'))
+        ->assertSee('<html lang="id"', false);
+});
+
 it('shows active products in the shop with database prices', function () {
     $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
     $product = Product::query()->create([

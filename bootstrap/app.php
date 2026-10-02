@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['admin' => EnsureUserIsAdmin::class]);
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'locale']);
 
         $middleware->web(append: [
             HandleAppearance::class,

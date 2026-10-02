@@ -1,3 +1,4 @@
+import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 const messages = {
@@ -123,30 +124,66 @@ const messages = {
 
 export type Language = keyof typeof messages;
 export type TranslationKey = keyof typeof messages.ID;
+type Locale = 'id' | 'en';
 
-function storedLanguage(): Language {
-    if (typeof window === 'undefined') return 'ID';
-    const saved = localStorage.getItem('mellif-language') ?? document.cookie.split('; ').find((item) => item.startsWith('mellif-language='))?.split('=')[1];
-    return saved === 'EN' ? 'EN' : 'ID';
+function languageForLocale(locale: Locale): Language {
+    return locale === 'en' ? 'EN' : 'ID';
+}
+
+function localeForLanguage(language: Language): Locale {
+    return language === 'EN' ? 'en' : 'id';
+}
+
+function readLocaleCookie(): string | null {
+    return document.cookie.split('; ').find((item) => item.startsWith('locale='))?.split('=')[1] ?? null;
+}
+
+function writeLocaleCookie(locale: Locale): void {
+    document.cookie = `locale=${locale}; Path=/; SameSite=Lax; Max-Age=31536000`;
 }
 
 export function useTranslation(): { language: Language; setLanguage: (language: Language) => void; t: (key: TranslationKey) => string } {
-    const [language, updateLanguage] = useState<Language>(storedLanguage);
+    const { props } = usePage<{ locale?: string }>();
+    const locale: Locale = props.locale === 'en' ? 'en' : 'id';
+    const [language, updateLanguage] = useState<Language>(() => languageForLocale(locale));
 
     useEffect(() => {
-        const refresh = (): void => updateLanguage(storedLanguage());
+        const cookieLocale = readLocaleCookie();
+        let initialLanguage = languageForLocale(locale);
+
+        if (cookieLocale === null) {
+            const legacyLanguage = localStorage.getItem('mellif-language');
+
+            if (legacyLanguage === 'EN' || legacyLanguage === 'ID') {
+                initialLanguage = legacyLanguage;
+            }
+        }
+
+        localStorage.removeItem('mellif-language');
+        writeLocaleCookie(localeForLanguage(initialLanguage));
+        updateLanguage(initialLanguage);
+
+        const refresh = (): void => {
+            const currentLocale = readLocaleCookie();
+
+            if (currentLocale === 'id' || currentLocale === 'en') {
+                updateLanguage(languageForLocale(currentLocale));
+            }
+        };
+
         window.addEventListener('mellif-language-changed', refresh);
-        window.addEventListener('storage', refresh);
         return () => {
             window.removeEventListener('mellif-language-changed', refresh);
-            window.removeEventListener('storage', refresh);
         };
     }, []);
 
+    useEffect(() => {
+        document.documentElement.lang = localeForLanguage(language);
+    }, [language]);
+
     const setLanguage = (next: Language): void => {
         updateLanguage(next);
-        localStorage.setItem('mellif-language', next);
-        document.cookie = `mellif-language=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
+        writeLocaleCookie(localeForLanguage(next));
         window.dispatchEvent(new Event('mellif-language-changed'));
     };
 
