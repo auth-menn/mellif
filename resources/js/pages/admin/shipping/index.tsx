@@ -1,0 +1,15 @@
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import adminRoutes from '@/routes/admin';
+
+type Courier = { id: number; name: string; code: string; flat_cost: number; is_active: boolean };
+type Page<T> = { data: T[]; links: { url: string | null; label: string; active: boolean }[] };
+
+export default function ShippingIndex({ couriers, editing }: { couriers: Page<Courier>; editing: Courier | null }) {
+    const form = useForm({ name: editing?.name ?? '', code: editing?.code ?? '', flat_cost: editing?.flat_cost ?? 0, is_active: editing?.is_active ?? true });
+    const submit = (event: React.FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        if (editing) form.put(adminRoutes.shipping.update.url({ shipping: editing.id }));
+        else form.post(adminRoutes.shipping.store.url());
+    };
+    return <><Head title="Ekspedisi — CMS Mellif" /><div className="mb-6 flex items-center justify-between"><h1 className="text-3xl font-medium">Ekspedisi</h1><Link href={adminRoutes.shipping.index.url()} className="text-sm underline">Ekspedisi baru</Link></div><div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]"><section className="overflow-x-auto border bg-white"><table className="w-full text-left text-sm"><thead className="bg-neutral-50"><tr><th className="p-4">Nama</th><th className="p-4">Kode</th><th className="p-4">Ongkir</th><th className="p-4">Status</th><th className="p-4">Aksi</th></tr></thead><tbody>{couriers.data.map((courier) => <tr key={courier.id} className="border-t"><td className="p-4">{courier.name}</td><td className="p-4">{courier.code}</td><td className="p-4">Rp {courier.flat_cost.toLocaleString('id-ID')}</td><td className="p-4">{courier.is_active ? 'Aktif' : 'Nonaktif'}</td><td className="p-4"><Link href={adminRoutes.shipping.index.url({ query: { edit: courier.id } })} className="mr-3 underline">Edit</Link><button onClick={() => { if (window.confirm('Hapus ekspedisi ini?')) router.delete(adminRoutes.shipping.destroy.url({ shipping: courier.id })); }} className="text-red-700 underline">Hapus</button></td></tr>)}</tbody></table></section><form onSubmit={submit} className="h-fit space-y-4 border bg-white p-5"><h2 className="font-medium">{editing ? 'Edit ekspedisi' : 'Ekspedisi baru'}</h2><label className="block text-sm">Nama<input value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} className="mt-2 w-full border p-3" /></label><label className="block text-sm">Kode<input value={form.data.code} onChange={(event) => form.setData('code', event.target.value)} className="mt-2 w-full border p-3" /></label><label className="block text-sm">Ongkir flat (Rp)<input type="number" min={0} value={form.data.flat_cost} onChange={(event) => form.setData('flat_cost', Number(event.target.value))} className="mt-2 w-full border p-3" /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.data.is_active} onChange={(event) => form.setData('is_active', event.target.checked)} />Aktif</label><button className="bg-black px-5 py-3 text-sm text-white">Simpan</button></form></div></>;
+}

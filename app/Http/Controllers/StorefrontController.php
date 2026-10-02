@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\StoreSetting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,7 +13,11 @@ class StorefrontController extends Controller
 {
     public function home(): Response
     {
-        return Inertia::render('store/home');
+        return Inertia::render('store/home', [
+            'tagline' => StoreSetting::query()->where('key', 'tagline')->value('value') ?? 'Made to move with your own rhythm.',
+            'heroImage' => $image = StoreSetting::query()->where('key', 'hero_image')->value('value'),
+            'heroImageUrl' => $image ? asset('storage/'.$image) : asset('images/hero.svg'),
+        ]);
     }
 
     public function about(): Response
