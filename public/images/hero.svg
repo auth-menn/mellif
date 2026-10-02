@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1100" fill="none">
+  <defs><linearGradient id="g" x1="180" y1="80" x2="1520" y2="1050" gradientUnits="userSpaceOnUse"><stop stop-color="#b7a998"/><stop offset=".5" stop-color="#494640"/><stop offset="1" stop-color="#151715"/></linearGradient><radialGradient id="r"><stop stop-color="#e0d5c6"/><stop offset="1" stop-color="#5b564e"/></radialGradient></defs>
+  <path fill="url(#g)" d="M0 0h1800v1100H0z"/><path fill="#242421" d="M0 710 1800 410v690H0z"/><circle cx="1330" cy="300" r="380" fill="url(#r)" opacity=".35"/><path d="M0 840 1800 560" stroke="#d4c5b3" stroke-opacity=".3" stroke-width="3"/><text x="120" y="860" fill="#fff" font-family="Arial,sans-serif" font-size="24" letter-spacing="10">MELLIF / LOCAL GOODS</text>
+</svg>
