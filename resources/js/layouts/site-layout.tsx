@@ -3,9 +3,10 @@ import { Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CartLine } from '@/types/store';
 import { money } from '@/types/store';
-import { login, about } from '@/routes';
+import { about, logout } from '@/routes';
 import { index as shopIndex } from '@/routes/shop';
 import { show as checkoutShow } from '@/routes/checkout';
+import AuthModal from '@/components/store/auth-modal';
 
 const readCart = (): CartLine[] => {
     try {
@@ -22,6 +23,8 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const user = (props.auth as { user?: { name: string } | null } | undefined)?.user;
     const [menuOpen, setMenuOpen] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
+    const [authOpen, setAuthOpen] = useState(false);
+    const [accountOpen, setAccountOpen] = useState(false);
     const [language, setLanguage] = useState<'ID' | 'EN'>('ID');
     const [cartCount, setCartCount] = useState(0);
     const [cart, setCart] = useState<CartLine[]>([]);
@@ -69,10 +72,11 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                         <button onClick={changeLanguage} aria-label="Ganti bahasa" className="flex items-center gap-1 text-xs"><span aria-hidden="true">🇮🇩</span><span>{language}</span></button>
                         <Link href={shopIndex.url()} aria-label="Cari produk" className="p-1"><Search size={22} strokeWidth={1.6} /></Link>
                         <button onClick={() => setCartOpen(true)} aria-label={`Keranjang, ${cartCount} item`} className="relative p-1"><ShoppingBag size={22} strokeWidth={1.6} />{cartCount > 0 && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">{cartCount}</span>}</button>
-                        {user ? <Link href="/dashboard" aria-label="Akun" className="hidden p-1 sm:block"><UserRound size={22} strokeWidth={1.6} /></Link> : <Link href={login.url()} aria-label="Login" className="hidden p-1 sm:block"><UserRound size={22} strokeWidth={1.6} /></Link>}
+                        {user ? <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen} aria-label="Akun" className="hidden p-1 sm:block"><UserRound size={22} strokeWidth={1.6} /></button> : <button onClick={() => setAuthOpen(true)} aria-label="Login" className="hidden p-1 sm:block"><UserRound size={22} strokeWidth={1.6} /></button>}
                     </div>
                 </div>
             </header>
+            {user && accountOpen && <div className="fixed right-5 top-[64px] z-50 min-w-52 border bg-white p-4 text-sm text-black shadow-lg"><p className="font-medium">{user.name}</p><Link href="/dashboard" onClick={() => setAccountOpen(false)} className="mt-3 block py-2">Pesanan Saya</Link><Link href={logout.url()} method="post" as="button" className="w-full border-t pt-3 text-left text-red-700">Logout</Link></div>}
             {children}
             {(menuOpen || cartOpen) && <button aria-label="Tutup panel" className="fixed inset-0 z-50 bg-black/45" onClick={() => { setMenuOpen(false); setCartOpen(false); }} />}
             <aside className={`fixed inset-y-0 left-0 z-[51] w-[min(360px,86vw)] bg-white p-7 text-black shadow-xl transition-transform ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!menuOpen}>
@@ -85,6 +89,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 <div className="flex-1 space-y-5 overflow-y-auto p-6 text-sm text-neutral-600">{cart.length === 0 ? <p>Keranjang Anda masih kosong.</p> : cart.map((line) => <div key={line.variant.id} className="flex gap-4"><img src={line.product.images[0] ?? '/storage/products/placeholder.svg'} alt="" className="h-24 w-20 bg-neutral-100 object-cover" /><div className="flex-1"><p className="font-medium text-black">{line.product.name}</p><p className="mt-1">Ukuran {line.variant.size} · Qty {line.quantity}</p><p className="mt-1 text-black">{money(line.product.discounted_price * line.quantity)}</p><button onClick={() => { const next = cart.filter((item) => item.variant.id !== line.variant.id); localStorage.setItem('mellif-cart', JSON.stringify(next)); window.dispatchEvent(new Event('mellif-cart-updated')); }} className="mt-2 text-xs underline">Hapus</button></div></div>)}</div>
                 <Link href={checkoutShow.url()} onClick={() => setCartOpen(false)} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white">Lanjut ke checkout</Link>
             </aside>
+            <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
         </div>
     );
 }
