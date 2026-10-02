@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\StoreSetting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,10 +14,29 @@ class StorefrontController extends Controller
 {
     public function home(): Response
     {
+        $image = StoreSetting::query()->where('key', 'hero_image')->value('value');
+        $productSlides = Product::query()
+            ->where('is_active', true)
+            ->whereHas('images')
+            ->with(['images:id,product_id,path,sort_order'])
+            ->orderByDesc('is_featured')
+            ->latest()
+            ->limit(8)
+            ->get(['id', 'name', 'is_featured', 'created_at'])
+            ->flatMap(fn (Product $product) => $product->images->map(fn (ProductImage $productImage): array => [
+                'id' => $productImage->id,
+                'imageUrl' => asset('storage/'.$productImage->path),
+                'alt' => $product->name,
+            ]))
+            ->unique('imageUrl')
+            ->take(8)
+            ->values();
+
         return Inertia::render('store/home', [
             'tagline' => StoreSetting::query()->where('key', 'tagline')->value('value') ?? 'Made to move with your own rhythm.',
-            'heroImage' => $image = StoreSetting::query()->where('key', 'hero_image')->value('value'),
-            'heroImageUrl' => $image ? asset('storage/'.$image) : asset('images/hero.svg'),
+            'heroImage' => $image,
+            'heroImageUrl' => $image ? asset('storage/'.$image) : asset('images/home/look-01.webp'),
+            'productSlides' => $productSlides,
         ]);
     }
 

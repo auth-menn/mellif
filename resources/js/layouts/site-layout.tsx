@@ -91,7 +91,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <div className="min-h-screen bg-white text-[#171815]">
-            <header className={`fixed z-40 transition-all duration-300 ease-out ${isHome ? homeScrolled ? 'left-1/2 right-auto top-3 h-12 w-[calc(100%-32px)] max-w-[1800px] -translate-x-1/2 rounded-2xl border border-white/40 bg-white/65 text-[#171815] shadow-lg shadow-black/10 backdrop-blur-xl md:h-14' : 'inset-x-0 top-0 h-14 bg-white/95 text-[#171815] md:h-16' : 'inset-x-0 top-0 h-14 bg-black text-white md:h-16'}`}>
+            <header className={`fixed z-40 transition-all duration-300 ease-out ${isHome ? homeScrolled ? 'left-1/2 right-auto top-3 h-12 w-[calc(100%-32px)] max-w-[1800px] -translate-x-1/2 rounded-2xl border border-white/15 bg-black/80 text-white shadow-lg shadow-black/20 backdrop-blur-xl md:h-14' : 'inset-x-0 top-0 h-14 bg-black text-white md:h-16' : 'inset-x-0 top-0 h-14 bg-black text-white md:h-16'}`}>
                 <div className="mx-auto grid h-full max-w-[1800px] grid-cols-3 items-center px-4 md:px-7">
                     <button aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(true)} className="w-fit p-1.5"><Menu size={24} strokeWidth={1.5} /></button>
                     <Link href="/" className="justify-self-center text-xl font-medium tracking-[0.16em]">MELLIF</Link>
