@@ -207,7 +207,7 @@ Use Wayfinder to generate TypeScript functions for Laravel routes. Import from `
 
 # Admin CMS Colors
 
-- Keep admin pages inside the `.admin-theme` wrapper, which pins the CMS to its scoped light color tokens regardless of the storefront theme.
+- Admin CMS is always light regardless of OS, browser, or storefront theme. Keep every admin page inside `.admin-theme`, whose scoped light tokens and surfaces define the admin palette.
 - Use dark text on light surfaces with at least 4.5:1 contrast for normal text; do not rely on global `html.dark` tokens or opacity-reduced text in admin UI.
 - Keep keyboard focus visible, and use `AdminStatusBadge` for status labels so their text and background remain legible.
 
