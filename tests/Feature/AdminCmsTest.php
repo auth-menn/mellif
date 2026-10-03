@@ -4,6 +4,7 @@ use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StoreSetting;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -65,15 +66,88 @@ it('restores order stock only once when rejecting an order', function () {
     expect($variant->fresh()->stock)->toBe(4);
 });
 
-it('updates the home hero image and tagline', function () {
+it('updates the legacy home hero image', function () {
     Storage::fake('public');
     $admin = User::factory()->create();
     $admin->forceFill(['is_admin' => true])->save();
 
     $this->actingAs($admin)->put(route('admin.home-settings.update'), [
-        'tagline' => 'Wear your point of view.',
         'hero_image' => UploadedFile::fake()->image('hero.webp'),
     ])->assertRedirect();
 
-    $this->get(route('home'))->assertInertia(fn ($page) => $page->where('tagline', 'Wear your point of view.'));
+    $heroImagePath = StoreSetting::query()->where('key', 'hero_image')->value('value');
+
+    expect($heroImagePath)->toBeString();
+    Storage::disk('public')->assertExists($heroImagePath);
+});
+
+it('stores multiple home videos and page two images for the storefront', function () {
+    Storage::fake('public');
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+
+    $this->actingAs($admin)->put(route('admin.home-settings.update'), [
+        'hero_videos' => [
+            UploadedFile::fake()->create('campaign-one.mp4', 100, 'video/mp4'),
+            UploadedFile::fake()->create('campaign-two.webm', 100, 'video/webm'),
+        ],
+        'page2_images' => [
+            UploadedFile::fake()->image('look-one.jpg'),
+            UploadedFile::fake()->image('look-two.webp'),
+        ],
+    ])->assertRedirect();
+
+    $heroVideos = json_decode(StoreSetting::query()->where('key', 'home_page1_videos')->value('value'), true, flags: JSON_THROW_ON_ERROR);
+    $page2Images = json_decode(StoreSetting::query()->where('key', 'home_page2_images')->value('value'), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($heroVideos)->toHaveCount(2)
+        ->and($page2Images)->toHaveCount(2);
+
+    foreach ([...$heroVideos, ...$page2Images] as $path) {
+        Storage::disk('public')->assertExists($path);
+    }
+
+    $this->get(route('home'))->assertInertia(fn ($page) => $page
+        ->has('heroVideos', 2)
+        ->has('productSlides', 2));
+});
+
+it('removes selected home media and keeps the rest', function () {
+    Storage::fake('public');
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+    $videoPaths = ['storefront/home/videos/one.mp4', 'storefront/home/videos/two.mp4'];
+    $imagePaths = ['storefront/home/images/one.jpg', 'storefront/home/images/two.jpg'];
+
+    foreach ([...$videoPaths, ...$imagePaths] as $path) {
+        Storage::disk('public')->put($path, 'media');
+    }
+
+    StoreSetting::query()->create(['key' => 'home_page1_videos', 'value' => json_encode($videoPaths, JSON_THROW_ON_ERROR)]);
+    StoreSetting::query()->create(['key' => 'home_page2_images', 'value' => json_encode($imagePaths, JSON_THROW_ON_ERROR)]);
+
+    $this->actingAs($admin)->put(route('admin.home-settings.update'), [
+        'remove_hero_video_indexes' => [0],
+        'remove_page2_image_indexes' => [1],
+    ])->assertRedirect();
+
+    expect(json_decode(StoreSetting::query()->where('key', 'home_page1_videos')->value('value'), true, flags: JSON_THROW_ON_ERROR))
+        ->toBe([$videoPaths[1]])
+        ->and(json_decode(StoreSetting::query()->where('key', 'home_page2_images')->value('value'), true, flags: JSON_THROW_ON_ERROR))
+        ->toBe([$imagePaths[0]]);
+
+    Storage::disk('public')->assertMissing($videoPaths[0]);
+    Storage::disk('public')->assertMissing($imagePaths[1]);
+    Storage::disk('public')->assertExists($videoPaths[1]);
+    Storage::disk('public')->assertExists($imagePaths[0]);
+});
+
+it('rejects unsupported files for home video and image uploads', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+
+    $this->actingAs($admin)->put(route('admin.home-settings.update'), [
+        'hero_videos' => [UploadedFile::fake()->image('not-a-video.png')],
+        'page2_images' => [UploadedFile::fake()->create('not-an-image.txt', 10, 'text/plain')],
+    ])->assertSessionHasErrors(['hero_videos.0', 'page2_images.0']);
 });
