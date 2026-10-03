@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import { index as shopIndex } from '@/routes/shop';
 
@@ -16,18 +16,63 @@ const fallbackSlides: HomeSlide[] = [
     { id: 4, imageUrl: '/images/home/look-04.webp', alt: '' },
 ];
 
-export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: string; productSlides: HomeSlide[] }) {
+export default function Home({ heroImageUrl, heroVideos, productSlides }: { heroImageUrl: string; heroVideos: string[]; productSlides: HomeSlide[] }) {
     const { t } = useTranslation();
     const heroFrameRef = useRef<HTMLDivElement>(null);
     const heroVideoRef = useRef<HTMLVideoElement>(null);
     const carouselRef = useRef<HTMLElement>(null);
     const carouselFrameRef = useRef<HTMLDivElement>(null);
-    const carouselTrackRef = useRef<HTMLDivElement>(null);
-    const dragState = useRef<{ startX: number; startScrollLeft: number } | null>(null);
+    const dragState = useRef<number | null>(null);
+    const pendingDirection = useRef<-1 | 1 | null>(null);
     const [activeSlide, setActiveSlide] = useState(0);
     const [carouselVisible, setCarouselVisible] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
-    const slides = productSlides.length > 1 ? productSlides : fallbackSlides;
+    const [isResetting, setIsResetting] = useState(false);
+    const [hasInteracted, setHasInteracted] = useState(false);
+    const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
+    const [heroVisible, setHeroVisible] = useState(false);
+    const slides = productSlides.length > 0 ? productSlides : fallbackSlides;
+    const activeHeroVideo = heroVideos[activeHeroVideoIndex] ?? heroVideos[0];
+
+    const completeTransition = useCallback((): void => {
+        const direction = pendingDirection.current;
+
+        if (direction === null) {
+            return;
+        }
+
+        pendingDirection.current = null;
+        setIsResetting(true);
+        setActiveSlide((currentSlide) => (currentSlide + direction + slides.length) % slides.length);
+        window.requestAnimationFrame(() => {
+            if (dragState.current === null) {
+                carouselFrameRef.current?.style.setProperty('--drag-offset', '0px');
+            }
+            window.requestAnimationFrame(() => setIsResetting(false));
+        });
+    }, [slides.length]);
+
+    const transitionSlide = useCallback((direction: -1 | 1): void => {
+        if (pendingDirection.current !== null) {
+            return;
+        }
+
+        const frameWidth = carouselFrameRef.current?.clientWidth ?? 0;
+
+        if (frameWidth === 0) {
+            setActiveSlide((currentSlide) => (currentSlide + direction + slides.length) % slides.length);
+
+            return;
+        }
+
+        pendingDirection.current = direction;
+        setIsDragging(false);
+        window.requestAnimationFrame(() => {
+            if (pendingDirection.current === direction) {
+                carouselFrameRef.current?.style.setProperty('--drag-offset', `${direction === 1 ? -frameWidth : frameWidth}px`);
+            }
+        });
+    }, [slides.length]);
 
     useEffect(() => {
         const frame = heroFrameRef.current;
@@ -77,20 +122,27 @@ export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: st
     }, []);
 
     useEffect(() => {
-        const video = heroVideoRef.current;
         const heroFrame = heroFrameRef.current;
 
-        if (!video || !heroFrame) {
+        if (!heroFrame) {
             return;
         }
 
         const observer = new IntersectionObserver(([entry]) => {
+            const video = heroVideoRef.current;
+
+            if (!video) {
+                return;
+            }
+
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !entry.isIntersecting) {
                 video.pause();
+                setHeroVisible(false);
 
                 return;
             }
 
+            setHeroVisible(true);
             void video.play().catch(() => undefined);
         }, { threshold: 0.1 });
 
@@ -98,6 +150,20 @@ export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: st
 
         return () => observer.disconnect();
     }, []);
+
+    useEffect(() => {
+        const video = heroVideoRef.current;
+
+        if (!video || !activeHeroVideo) {
+            return;
+        }
+
+        video.load();
+
+        if (heroVisible && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            void video.play().catch(() => undefined);
+        }
+    }, [activeHeroVideo, heroVisible]);
 
     useEffect(() => {
         const carousel = carouselRef.current;
@@ -116,19 +182,14 @@ export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: st
     }, []);
 
     useEffect(() => {
-        const track = carouselTrackRef.current;
-
-        if (!track || !carouselVisible || isDragging || slides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (!carouselVisible || isDragging || hasInteracted || slides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             return;
         }
 
         let interval = 0;
         const startAutoplay = window.setTimeout(() => {
             interval = window.setInterval(() => {
-                const currentSlide = Math.round(track.scrollLeft / track.clientWidth);
-                const nextSlide = (currentSlide + 1) % slides.length;
-
-                track.scrollTo({ left: nextSlide * track.clientWidth, behavior: 'smooth' });
+                transitionSlide(1);
             }, 2000);
         }, 4000);
 
@@ -136,7 +197,7 @@ export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: st
             window.clearTimeout(startAutoplay);
             window.clearInterval(interval);
         };
-    }, [carouselVisible, isDragging, slides.length]);
+    }, [carouselVisible, hasInteracted, isDragging, slides.length, transitionSlide]);
 
     return (
         <>
@@ -147,17 +208,18 @@ export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: st
                         <Link href={shopIndex.url()} aria-label={t('nav.shop')} className="absolute inset-0 z-10 cursor-pointer" />
                         <div ref={heroFrameRef} className="absolute inset-0 overflow-hidden bg-neutral-900 [will-change:clip-path,transform]">
                             <video
+                                key={activeHeroVideo}
                                 ref={heroVideoRef}
                                 aria-hidden="true"
                                 muted
-                                loop
+                                loop={heroVideos.length === 1}
                                 playsInline
                                 preload="metadata"
                                 poster={heroImageUrl}
+                                src={activeHeroVideo}
+                                onEnded={() => setActiveHeroVideoIndex((index) => (index + 1) % heroVideos.length)}
                                 className="h-full w-full object-cover"
-                            >
-                                <source src="/videos/home-campaign.mp4" type="video/mp4" />
-                            </video>
+                            />
                             <div className="pointer-events-none absolute inset-0 bg-black/10" />
                         </div>
                     </div>
@@ -168,67 +230,92 @@ export default function Home({ heroImageUrl, productSlides }: { heroImageUrl: st
                     className="relative isolate grid min-h-[100svh] cursor-grab touch-pan-y select-none place-items-center overflow-hidden bg-white active:cursor-grabbing"
                     aria-label={t('home.collection')}
                 >
-                    <div ref={carouselFrameRef} className="absolute inset-0 overflow-hidden bg-black [will-change:clip-path,transform]">
-                        <div
-                            ref={carouselTrackRef}
-                            className="absolute inset-0 flex cursor-grab snap-x snap-mandatory touch-pan-y select-none overflow-x-auto overscroll-x-contain active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                            onPointerDown={(event) => {
-                                if (event.button !== 0) {
-                                    return;
+                    <div
+                        ref={carouselFrameRef}
+                        className="absolute inset-0 cursor-grab overflow-hidden bg-black [will-change:clip-path,transform] active:cursor-grabbing"
+                        onPointerDown={(event) => {
+                            if (event.button !== 0) {
+                                return;
+                            }
+
+                            if (pendingDirection.current !== null) {
+                                completeTransition();
+                                event.currentTarget.style.setProperty('--drag-offset', '0px');
+                            }
+
+                            dragState.current = event.clientX;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            event.currentTarget.style.setProperty('--drag-offset', '0px');
+                            setIsDragging(true);
+                        }}
+                        onPointerMove={(event) => {
+                            if (dragState.current !== null) {
+                                if (Math.abs(event.clientX - dragState.current) > 3) {
+                                    setHasInteracted(true);
                                 }
 
-                                dragState.current = { startX: event.clientX, startScrollLeft: event.currentTarget.scrollLeft };
-                                event.currentTarget.style.scrollBehavior = 'auto';
-                                event.currentTarget.style.scrollSnapType = 'none';
-                                event.currentTarget.setPointerCapture(event.pointerId);
-                                setIsDragging(true);
-                            }}
-                            onPointerMove={(event) => {
-                                const currentDrag = dragState.current;
+                                const frameWidth = event.currentTarget.clientWidth;
+                                const distance = event.clientX - dragState.current;
 
-                                if (currentDrag !== null) {
-                                    event.currentTarget.scrollLeft = currentDrag.startScrollLeft - (event.clientX - currentDrag.startX);
-                                }
-                            }}
-                            onPointerUp={(event) => {
-                                dragState.current = null;
-                                setIsDragging(false);
-                                event.currentTarget.style.scrollBehavior = '';
-                                event.currentTarget.style.scrollSnapType = '';
-                            }}
-                            onPointerCancel={(event) => {
-                                dragState.current = null;
-                                setIsDragging(false);
-                                event.currentTarget.style.scrollBehavior = '';
-                                event.currentTarget.style.scrollSnapType = '';
-                            }}
-                            onLostPointerCapture={(event) => {
-                                dragState.current = null;
-                                setIsDragging(false);
-                                event.currentTarget.style.scrollBehavior = '';
-                                event.currentTarget.style.scrollSnapType = '';
-                            }}
-                            onScroll={(event) => {
-                                const track = event.currentTarget;
-                                const currentSlide = Math.round(track.scrollLeft / track.clientWidth);
+                                event.currentTarget.style.setProperty('--drag-offset', `${Math.max(-frameWidth, Math.min(frameWidth, distance))}px`);
+                            }
+                        }}
+                        onPointerUp={(event) => {
+                            const startX = dragState.current;
+                            dragState.current = null;
+                            setIsDragging(false);
 
-                                setActiveSlide(Math.min(currentSlide, slides.length - 1));
-                            }}
-                        >
-                            {slides.map((slide, index) => (
-                                <div key={slide.id} className="relative h-full w-full min-w-full shrink-0 snap-start">
+                            if (startX === null) {
+                                return;
+                            }
+
+                            const distance = event.clientX - startX;
+                            const threshold = Math.max(48, event.currentTarget.clientWidth * 0.12);
+
+                            if (Math.abs(distance) >= threshold) {
+                                transitionSlide(distance < 0 ? 1 : -1);
+                            } else {
+                                const frame = event.currentTarget;
+                                window.requestAnimationFrame(() => {
+                                    if (dragState.current === null && pendingDirection.current === null) {
+                                        frame.style.setProperty('--drag-offset', '0px');
+                                    }
+                                });
+                            }
+                        }}
+                        onPointerCancel={(event) => {
+                            dragState.current = null;
+                            setIsDragging(false);
+                            event.currentTarget.style.setProperty('--drag-offset', '0px');
+                        }}
+                    >
+                        {([-1, 0, 1] as const).map((relativeIndex) => {
+                            const slideIndex = (activeSlide + relativeIndex + slides.length) % slides.length;
+                            return (
+                                <div
+                                    key={relativeIndex}
+                                    className={`absolute inset-0 [will-change:transform] ${isDragging || isResetting ? 'transition-none' : 'transition-transform duration-500 ease-out'}`}
+                                    style={{ transform: `translate3d(calc(${relativeIndex * 100}% + var(--drag-offset, 0px)), 0, 0)` }}
+                                    onTransitionEnd={(event) => {
+                                        if (relativeIndex !== 0 || event.propertyName !== 'transform' || pendingDirection.current === null) {
+                                            return;
+                                        }
+
+                                        completeTransition();
+                                    }}
+                                >
                                     <img
-                                        src={slide.imageUrl}
-                                        alt={slide.alt}
+                                        src={slides[slideIndex].imageUrl}
+                                        alt={slides[slideIndex].alt}
                                         draggable={false}
-                                        aria-hidden={index !== activeSlide}
-                                        fetchPriority={index === 0 ? 'high' : 'low'}
+                                        aria-hidden={relativeIndex !== 0}
+                                        fetchPriority={relativeIndex === 0 ? 'high' : 'low'}
                                         decoding="async"
-                                        className="h-full w-full select-none object-cover"
+                                        className="pointer-events-none h-full w-full select-none object-cover"
                                     />
                                 </div>
-                            ))}
-                        </div>
+                            );
+                        })}
                         <div className="pointer-events-none absolute inset-0 bg-black/10" />
                     </div>
                 </section>
