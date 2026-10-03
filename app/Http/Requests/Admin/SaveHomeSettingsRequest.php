@@ -22,7 +22,14 @@ class SaveHomeSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tagline' => ['required', 'string', 'max:180'],
+            'hero_videos' => ['nullable', 'array'],
+            'hero_videos.*' => ['file', 'mimes:mp4,webm', 'max:102400'],
+            'remove_hero_video_indexes' => ['nullable', 'array'],
+            'remove_hero_video_indexes.*' => ['integer', 'min:0'],
+            'page2_images' => ['nullable', 'array'],
+            'page2_images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'remove_page2_image_indexes' => ['nullable', 'array'],
+            'remove_page2_image_indexes.*' => ['integer', 'min:0'],
             'hero_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
