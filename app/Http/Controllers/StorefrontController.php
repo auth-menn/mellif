@@ -15,29 +15,51 @@ class StorefrontController extends Controller
     public function home(): Response
     {
         $image = StoreSetting::query()->where('key', 'hero_image')->value('value');
-        $productSlides = Product::query()
-            ->where('is_active', true)
-            ->whereHas('images')
-            ->with(['images:id,product_id,path,sort_order'])
-            ->orderByDesc('is_featured')
-            ->latest()
-            ->limit(8)
-            ->get(['id', 'name', 'is_featured', 'created_at'])
-            ->flatMap(fn (Product $product) => $product->images->map(fn (ProductImage $productImage): array => [
-                'id' => $productImage->id,
-                'imageUrl' => asset('storage/'.$productImage->path),
-                'alt' => $product->name,
-            ]))
-            ->unique('imageUrl')
-            ->take(8)
+        $heroVideos = $this->settingPaths('home_page1_videos');
+        $heroVideos = $heroVideos === []
+            ? [asset('videos/home-campaign.mp4')]
+            : array_map(fn (string $path): string => asset('storage/'.$path), $heroVideos);
+        $page2Images = collect($this->settingPaths('home_page2_images'))
+            ->map(fn (string $path, int $index): array => [
+                'id' => $index + 1,
+                'imageUrl' => asset('storage/'.$path),
+                'alt' => '',
+            ])
             ->values();
 
+        if ($page2Images->isEmpty()) {
+            $page2Images = Product::query()
+                ->where('is_active', true)
+                ->whereHas('images')
+                ->with(['images:id,product_id,path,sort_order'])
+                ->orderByDesc('is_featured')
+                ->latest()
+                ->limit(8)
+                ->get(['id', 'name', 'is_featured', 'created_at'])
+                ->flatMap(fn (Product $product) => $product->images->map(fn (ProductImage $productImage): array => [
+                    'id' => $productImage->id,
+                    'imageUrl' => asset('storage/'.$productImage->path),
+                    'alt' => $product->name,
+                ]))
+                ->unique('imageUrl')
+                ->take(8)
+                ->values();
+        }
+
         return Inertia::render('store/home', [
-            'tagline' => StoreSetting::query()->where('key', 'tagline')->value('value') ?? 'Made to move with your own rhythm.',
             'heroImage' => $image,
             'heroImageUrl' => $image ? asset('storage/'.$image) : asset('images/home/look-01.webp'),
-            'productSlides' => $productSlides,
+            'heroVideos' => $heroVideos,
+            'productSlides' => $page2Images,
         ]);
+    }
+
+    /** @return list<string> */
+    private function settingPaths(string $key): array
+    {
+        $paths = json_decode(StoreSetting::query()->where('key', $key)->value('value') ?? '[]', true);
+
+        return is_array($paths) ? array_values(array_filter($paths, 'is_string')) : [];
     }
 
     public function about(): Response
