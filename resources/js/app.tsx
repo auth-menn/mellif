@@ -8,10 +8,10 @@ import SettingsLayout from '@/layouts/settings/layout';
 import SiteLayout from '@/layouts/site-layout';
 import AdminLayout from '@/layouts/admin-layout';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = 'Mellif Studio';
 
 void createInertiaApp({
-    title: (title) => (title ? `${title} - ${appName}` : appName),
+    title: () => appName,
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
