@@ -94,7 +94,17 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             <header className={`fixed z-40 transition-all duration-300 ease-out ${isHome ? homeScrolled ? 'left-1/2 right-auto top-3 h-12 w-[calc(100%-32px)] max-w-[1800px] -translate-x-1/2 rounded-2xl border border-white/15 bg-black/80 text-white shadow-lg shadow-black/20 backdrop-blur-xl md:h-14' : 'inset-x-0 top-0 h-14 bg-black text-white md:h-16' : 'inset-x-0 top-0 h-14 bg-black text-white md:h-16'}`}>
                 <div className="mx-auto grid h-full max-w-[1800px] grid-cols-3 items-center px-4 md:px-7">
                     <button aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(true)} className="w-fit p-1.5"><Menu size={24} strokeWidth={1.5} /></button>
-                    <Link href="/" className={`justify-self-center font-medium tracking-[0.16em] transition-[font-size] duration-300 ${isHome && homeScrolled ? 'text-lg' : 'text-xl'}`}>MELLIF</Link>
+                    <Link href="/" aria-label="Mellif" className="justify-self-center">
+                        <video
+                            src="/videos/mellif-logo.webm"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            aria-hidden="true"
+                            className={`object-contain transition-[width,height] duration-300 ${isHome && homeScrolled ? 'h-12 w-24' : 'h-14 w-28'}`}
+                        />
+                    </Link>
                     <div className="flex items-center justify-self-end gap-2.5 md:gap-4">
                         <div className="relative">
                             <button type="button" onClick={() => setLanguageOpen(!languageOpen)} aria-label={t('nav.language')} aria-expanded={languageOpen} title={t('nav.language')} className="flex items-center gap-1.5 px-1.5 py-1 text-sm">
