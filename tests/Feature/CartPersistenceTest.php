@@ -30,6 +30,19 @@ it('stores and updates authenticated cart items while validating current stock',
     $this->getJson(route('cart.index'))->assertOk()->assertJsonPath('items.0.quantity', 2);
 });
 
+it('rejects adding more than the remaining stock to an existing cart item', function () {
+    $user = User::factory()->create();
+    $variant = createCartVariant(4);
+    CartItem::query()->create(['user_id' => $user->id, 'product_variant_id' => $variant->id, 'quantity' => 3]);
+
+    $this->actingAs($user)->postJson(route('cart.items.store'), [
+        'variant_id' => $variant->id,
+        'quantity' => 2,
+    ])->assertUnprocessable();
+
+    expect($user->cartItems()->firstOrFail()->quantity)->toBe(3);
+});
+
 it('merges guest items into the account cart and caps quantities to available stock', function () {
     $user = User::factory()->create();
     $variant = createCartVariant(4);
@@ -46,3 +59,15 @@ it('merges guest items into the account cart and caps quantities to available st
 it('requires authentication for server cart access', function () {
     $this->getJson(route('cart.index'))->assertUnauthorized();
 });
+
+it('rejects non-canonical cart quantities with a 422 response', function (mixed $quantity) {
+    $user = User::factory()->create();
+    $variant = createCartVariant(5);
+
+    $this->actingAs($user)->postJson(route('cart.items.store'), [
+        'variant_id' => $variant->id,
+        'quantity' => $quantity,
+    ])->assertUnprocessable()->assertJsonValidationErrors('quantity');
+
+    expect($user->cartItems()->count())->toBe(0);
+})->with([0, 1.4, '01']);
