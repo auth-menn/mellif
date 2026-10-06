@@ -2,6 +2,27 @@
 
 @import 'tw-animate-css';
 
+@keyframes shop-menu-arrow {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    50% {
+        transform: translateX(-5px);
+    }
+}
+
+.shop-menu-arrow {
+    animation: shop-menu-arrow 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shop-menu-arrow {
+        animation: none;
+    }
+}
+
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
