@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class SaveShippingCourierRequest extends FormRequest
 {
@@ -24,8 +23,6 @@ class SaveShippingCourierRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:120'],
-            'code' => ['required', 'string', 'alpha_dash', 'max:40', Rule::unique('shipping_couriers', 'code')->ignore($this->route('shipping'))],
-            'flat_cost' => ['required', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
