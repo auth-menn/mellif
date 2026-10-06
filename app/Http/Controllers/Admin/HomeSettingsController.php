@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveHomeSettingsRequest;
+use App\Models\Product;
 use App\Models\StoreSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
@@ -21,6 +22,7 @@ class HomeSettingsController extends Controller
         return Inertia::render('admin/home-settings/edit', [
             'heroVideos' => $this->mediaItems('home_page1_videos'),
             'page2Images' => $this->mediaItems('home_page2_images'),
+            'products' => Product::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'slug']),
         ]);
     }
 
@@ -28,17 +30,34 @@ class HomeSettingsController extends Controller
     {
         $data = $request->validated();
         $heroVideos = $this->settingPaths('home_page1_videos');
-        $page2Images = $this->settingPaths('home_page2_images');
+        $page2Images = $this->settingImages();
         $removedPaths = [];
         $heroVideos = $this->removeSelectedPaths($heroVideos, $data['remove_hero_video_indexes'] ?? [], $removedPaths);
-        $page2Images = $this->removeSelectedPaths($page2Images, $data['remove_page2_image_indexes'] ?? [], $removedPaths);
+        $removedIndexes = array_fill_keys(array_map('intval', $data['remove_page2_image_indexes'] ?? []), true);
+        foreach ($page2Images as $index => $image) {
+            if (isset($removedIndexes[$index])) {
+                $removedPaths[] = $image['path'];
+            }
+        }
+        $page2Images = array_values(array_filter($page2Images, fn (array $image, int $index): bool => ! isset($removedIndexes[$index]), ARRAY_FILTER_USE_BOTH));
+        $productIds = array_values(array_filter($data['page2_product_ids'] ?? [], fn (mixed $id, int $index): bool => ! isset($removedIndexes[$index]), ARRAY_FILTER_USE_BOTH));
         $uploadedPaths = [];
         $oldHeroImage = StoreSetting::query()->where('key', 'hero_image')->value('value');
         $newHeroImage = null;
 
         try {
             $heroVideos = [...$heroVideos, ...$this->storeUploads($request->file('hero_videos', []), 'storefront/home/videos', $uploadedPaths)];
-            $page2Images = [...$page2Images, ...$this->storeUploads($request->file('page2_images', []), 'storefront/home/images', $uploadedPaths)];
+            $uploadedImages = $this->storeUploads($request->file('page2_images', []), 'storefront/home/images', $uploadedPaths);
+            $page2Images = [...$page2Images, ...array_map(fn (string $path, int $index): array => [
+                'path' => $path,
+                'product_id' => ($data['page2_upload_product_ids'][$index] ?? null) ?: null,
+            ], $uploadedImages, array_keys($uploadedImages))];
+            foreach ($page2Images as $index => &$image) {
+                if ($index < count($productIds)) {
+                    $image['product_id'] = $productIds[$index];
+                }
+            }
+            unset($image);
 
             if ($request->hasFile('hero_image')) {
                 $newHeroImage = $request->file('hero_image')->store('storefront', 'public');
@@ -70,16 +89,41 @@ class HomeSettingsController extends Controller
 
         Storage::disk('public')->delete(array_values(array_unique($removedPaths)));
 
-        return back()->with('success', 'Pengaturan beranda disimpan.');
+        return Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.homeSettingsUpdated'])->back();
     }
 
-    /** @return list<array{path: string, url: string}> */
+    /** @return list<array{path: string, url: string, productId: int|null}> */
     private function mediaItems(string $key): array
     {
+        if ($key === 'home_page2_images') {
+            return array_map(fn (array $image): array => [
+                'path' => $image['path'],
+                'url' => asset('storage/'.$image['path']),
+                'productId' => $image['product_id'],
+            ], $this->settingImages());
+        }
+
         return array_map(fn (string $path): array => [
             'path' => $path,
             'url' => asset('storage/'.$path),
+            'productId' => null,
         ], $this->settingPaths($key));
+    }
+
+    /** @return list<array{path: string, product_id: int|null}> */
+    private function settingImages(): array
+    {
+        $stored = json_decode(StoreSetting::query()->where('key', 'home_page2_images')->value('value') ?? '[]', true);
+
+        if (! is_array($stored)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(fn (mixed $image): ?array => is_string($image)
+            ? ['path' => $image, 'product_id' => null]
+            : (is_array($image) && is_string($image['path'] ?? null)
+                ? ['path' => $image['path'], 'product_id' => isset($image['product_id']) ? (int) $image['product_id'] : null]
+                : null), $stored)));
     }
 
     /** @return list<string> */
