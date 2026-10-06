@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductVariant;
 use App\Models\StoreSetting;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,11 +21,15 @@ class StorefrontController extends Controller
         $heroVideos = $heroVideos === []
             ? [asset('videos/home-campaign.mp4')]
             : array_map(fn (string $path): string => asset('storage/'.$path), $heroVideos);
-        $page2Images = collect($this->settingPaths('home_page2_images'))
-            ->map(fn (string $path, int $index): array => [
+        $storedImages = $this->settingImages();
+        $linkedProductSlugs = Product::query()->whereIn('id', array_filter(array_column($storedImages, 'product_id')))
+            ->where('is_active', true)->pluck('slug', 'id');
+        $page2Images = collect($storedImages)
+            ->map(fn (array $image, int $index): array => [
                 'id' => $index + 1,
-                'imageUrl' => asset('storage/'.$path),
+                'imageUrl' => asset('storage/'.$image['path']),
                 'alt' => '',
+                'productUrl' => $image['product_id'] ? $linkedProductSlugs->get($image['product_id']) : null,
             ])
             ->values();
 
@@ -40,6 +46,7 @@ class StorefrontController extends Controller
                     'id' => $productImage->id,
                     'imageUrl' => asset('storage/'.$productImage->path),
                     'alt' => $product->name,
+                    'productUrl' => $product->slug,
                 ]))
                 ->unique('imageUrl')
                 ->take(8)
@@ -62,13 +69,46 @@ class StorefrontController extends Controller
         return is_array($paths) ? array_values(array_filter($paths, 'is_string')) : [];
     }
 
+    /** @return list<array{path: string, product_id: int|null}> */
+    private function settingImages(): array
+    {
+        $stored = json_decode(StoreSetting::query()->where('key', 'home_page2_images')->value('value') ?? '[]', true);
+
+        if (! is_array($stored)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(fn (mixed $image): ?array => is_string($image)
+            ? ['path' => $image, 'product_id' => null]
+            : (is_array($image) && is_string($image['path'] ?? null)
+                ? ['path' => $image['path'], 'product_id' => isset($image['product_id']) ? (int) $image['product_id'] : null]
+                : null), $stored)));
+    }
+
     public function about(): Response
     {
         return Inertia::render('store/about');
     }
 
-    public function shop(Request $request): Response
+    public function shop(Request $request): Response|RedirectResponse
     {
+        $popularCategory = $request->string('popular_category')->trim()->toString();
+
+        if ($popularCategory !== '') {
+            $category = Category::query()
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($popularCategory)])
+                ->first();
+
+            if ($category) {
+                return to_route('shop.index', array_filter([
+                    'categories' => $category->id,
+                    'q' => $request->string('q')->trim()->toString(),
+                ], fn (string|int $value): bool => (string) $value !== ''));
+            }
+
+            return to_route('shop.index', ['q' => $request->string('q')->trim()->toString() ?: $popularCategory]);
+        }
+
         $query = Product::query()->where('is_active', true)->with(['category', 'images', 'variants']);
 
         if ($request->filled('q')) {
@@ -85,6 +125,16 @@ class StorefrontController extends Controller
         if ($request->boolean('in_stock')) {
             $query->whereHas('variants', fn ($variants) => $variants->where('stock', '>', 0));
         }
+        if ($request->filled('size')) {
+            $selectedSizes = array_values(array_filter(
+                explode(',', $request->string('size')->toString()),
+                fn (string $size): bool => $size !== '',
+            ));
+
+            if ($selectedSizes !== []) {
+                $query->whereHas('variants', fn ($variants) => $variants->whereIn('size', $selectedSizes));
+            }
+        }
         if ($request->filled('min')) {
             $query->where('price', '>=', max(0, $request->integer('min')));
         }
@@ -100,9 +150,18 @@ class StorefrontController extends Controller
         };
 
         return Inertia::render('store/shop', [
-            'products' => $query->paginate(12)->withQueryString()->through(fn (Product $product) => $this->productData($product)),
+            'products' => $query->paginate(9)->withQueryString()->through(fn (Product $product) => $this->productData($product)),
+            'priceRange' => [
+                'min' => (int) (Product::query()->where('is_active', true)->min('price') ?? 0),
+                'max' => (int) (Product::query()->where('is_active', true)->max('price') ?? 100000),
+            ],
             'categories' => Category::query()->orderBy('sort_order')->get(['id', 'name']),
-            'filters' => $request->only(['q', 'categories', 'type', 'in_stock', 'min', 'max', 'sort']),
+            'sizes' => ProductVariant::query()
+                ->whereHas('product', fn ($products) => $products->where('is_active', true))
+                ->distinct()
+                ->orderBy('size')
+                ->pluck('size'),
+            'filters' => $request->only(['q', 'categories', 'type', 'in_stock', 'min', 'max', 'size', 'sort']),
         ]);
     }
 
