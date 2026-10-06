@@ -35,6 +35,10 @@ export async function loadServerCart(): Promise<CartLine[]> {
 }
 
 export async function saveCartLine(product: Product, variant: StoreVariant, quantity: number, isAuthenticated: boolean): Promise<void> {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99 || quantity > variant.stock) {
+        throw new Error('Jumlah produk tidak valid.');
+    }
+
     if (isAuthenticated) {
         await cartRequest(cartRoutes.items.store.url(), 'POST', { variant_id: variant.id, quantity });
         window.dispatchEvent(new Event('mellif-cart-updated'));
@@ -43,7 +47,8 @@ export async function saveCartLine(product: Product, variant: StoreVariant, quan
 
     const cart = readGuestCart();
     const existing = cart.find((line) => line.variant.id === variant.id);
-    if (existing) existing.quantity = Math.min(variant.stock, existing.quantity + quantity);
+    if (existing && existing.quantity + quantity > variant.stock) throw new Error('Stok produk tidak mencukupi.');
+    if (existing) existing.quantity += quantity;
     else cart.push({ product, variant, quantity });
     localStorage.setItem('mellif-cart', JSON.stringify(cart));
     window.dispatchEvent(new Event('mellif-cart-updated'));
