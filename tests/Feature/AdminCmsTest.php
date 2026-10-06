@@ -33,7 +33,7 @@ it('creates a product with ordered uploaded images and variants', function () {
     ]);
 
     $product = Product::query()->where('name', 'Studio Tee')->firstOrFail();
-    $response->assertRedirect(route('admin.products.edit', $product));
+    $response->assertRedirect(route('admin.products.index'));
     expect($product->images()->orderBy('sort_order')->first()?->path)->toStartWith('products/');
     expect($product->variants()->count())->toBe(2);
     Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
@@ -103,7 +103,7 @@ it('stores multiple home videos and page two images for the storefront', functio
     expect($heroVideos)->toHaveCount(2)
         ->and($page2Images)->toHaveCount(2);
 
-    foreach ([...$heroVideos, ...$page2Images] as $path) {
+    foreach ([...$heroVideos, ...array_column($page2Images, 'path')] as $path) {
         Storage::disk('public')->assertExists($path);
     }
 
@@ -133,7 +133,7 @@ it('removes selected home media and keeps the rest', function () {
 
     expect(json_decode(StoreSetting::query()->where('key', 'home_page1_videos')->value('value'), true, flags: JSON_THROW_ON_ERROR))
         ->toBe([$videoPaths[1]])
-        ->and(json_decode(StoreSetting::query()->where('key', 'home_page2_images')->value('value'), true, flags: JSON_THROW_ON_ERROR))
+        ->and(array_column(json_decode(StoreSetting::query()->where('key', 'home_page2_images')->value('value'), true, flags: JSON_THROW_ON_ERROR), 'path'))
         ->toBe([$imagePaths[0]]);
 
     Storage::disk('public')->assertMissing($videoPaths[0]);
