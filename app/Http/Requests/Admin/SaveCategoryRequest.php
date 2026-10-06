@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class SaveCategoryRequest extends FormRequest
 {
@@ -24,8 +23,6 @@ class SaveCategoryRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:120'],
-            'sort_order' => ['nullable', 'integer', 'min:0'],
-            'slug' => ['nullable', 'string', 'max:140', Rule::unique('categories', 'slug')->ignore($this->route('category'))],
         ];
     }
 }
