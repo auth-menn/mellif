@@ -26,7 +26,21 @@ class ProductController extends Controller
         $products = Product::query()->with(['category', 'images', 'variants'])->when(
             $request->filled('search'),
             fn ($query) => $query->where('name', 'like', '%'.$request->string('search')->toString().'%'),
-        )->latest()->paginate(15)->withQueryString();
+        )->latest()->paginate(15)->withQueryString()->through(fn (Product $product): array => [
+            'id' => $product->id,
+            'name' => $product->name,
+            'category' => $product->category ? ['name' => $product->category->name] : null,
+            'images' => $product->images->map(fn ($image): array => [
+                'id' => $image->id,
+                'path' => $image->path,
+                'sort_order' => $image->sort_order,
+            ])->all(),
+            'discounted_price' => $product->discounted_price,
+            'discount_percent' => $product->discount_percent,
+            'is_active' => $product->is_active,
+            'is_featured' => $product->is_featured,
+            'stock' => $product->variants->sum('stock'),
+        ]);
 
         return Inertia::render('admin/products/index', [
             'products' => $products,
@@ -47,16 +61,16 @@ class ProductController extends Controller
      */
     public function store(SaveProductRequest $request): RedirectResponse
     {
-        $product = DB::transaction(function () use ($request): Product {
+        DB::transaction(function () use ($request): void {
             $data = $request->validated();
             $product = Product::query()->create($this->productAttributes($data));
             $this->syncImages($product, $request);
             $this->syncVariants($product, $data['variants']);
-
-            return $product;
         });
 
-        return redirect()->route('admin.products.edit', $product)->with('success', 'Produk berhasil dibuat.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.productCreated']);
+
+        return redirect()->route('admin.products.index');
     }
 
     /**
@@ -90,7 +104,17 @@ class ProductController extends Controller
             $this->syncVariants($product, $data['variants']);
         });
 
-        return redirect()->route('admin.products.edit', $product)->with('success', 'Produk berhasil diperbarui.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.productUpdated']);
+
+        return redirect()->route('admin.products.index');
+    }
+
+    public function updateStatus(Request $request, Product $product): RedirectResponse
+    {
+        $data = $request->validate(['is_active' => ['required', 'boolean']]);
+        $product->update(['is_active' => $data['is_active']]);
+
+        return Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.productStatusUpdated'])->back();
     }
 
     /**
@@ -98,13 +122,11 @@ class ProductController extends Controller
      */
     public function destroy(Product $product): RedirectResponse
     {
-        DB::transaction(function () use ($product): void {
-            $product->update(['is_active' => false]);
-            $product->images()->each(fn ($image) => Storage::disk('public')->delete($image->path));
-            $product->images()->delete();
-        });
+        $imagePaths = $product->images()->pluck('path');
+        $product->delete();
+        Storage::disk('public')->delete($imagePaths->all());
 
-        return redirect()->route('admin.products.index')->with('success', 'Produk dinonaktifkan.');
+        return Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.productDeleted'])->back();
     }
 
     /** @param array<string, mixed> $data
