@@ -41,10 +41,12 @@ class CategoryController extends Controller
     public function store(SaveCategoryRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
+        $data['slug'] = $this->uniqueSlug($data['name']);
         Category::query()->create($data);
 
-        return redirect()->route('admin.categories.index')->with('success', 'Kategori dibuat.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.categoryCreated']);
+
+        return redirect()->route('admin.categories.index');
     }
 
     /**
@@ -69,10 +71,12 @@ class CategoryController extends Controller
     public function update(SaveCategoryRequest $request, Category $category): RedirectResponse
     {
         $data = $request->validated();
-        $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
+        $data['slug'] = $this->uniqueSlug($data['name'], $category);
         $category->update($data);
 
-        return redirect()->route('admin.categories.index')->with('success', 'Kategori diperbarui.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.categoryUpdated']);
+
+        return redirect()->route('admin.categories.index');
     }
 
     /**
@@ -83,6 +87,25 @@ class CategoryController extends Controller
         abort_if($category->products()->exists(), 422, 'Kategori masih digunakan produk.');
         $category->delete();
 
-        return redirect()->route('admin.categories.index')->with('success', 'Kategori dihapus.');
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.categoryDeleted']);
+
+        return redirect()->route('admin.categories.index');
+    }
+
+    private function uniqueSlug(string $name, ?Category $category = null): string
+    {
+        $baseSlug = Str::slug($name) ?: 'category';
+        $slug = $baseSlug;
+        $suffix = 2;
+
+        while (Category::query()->where('slug', $slug)->when(
+            $category,
+            fn ($query) => $query->where('id', '!=', $category->id),
+        )->exists()) {
+            $slug = $baseSlug.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $slug;
     }
 }
