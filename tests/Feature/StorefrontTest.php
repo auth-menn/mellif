@@ -73,7 +73,7 @@ it('creates an order with server prices and reduces locked variant stock', funct
     expect($user->cartItems()->count())->toBe(0);
 });
 
-it('rejects checkout when requested quantity exceeds current stock', function () {
+it('rejects checkout when quantity is fractional or exceeds current stock', function () {
     $user = User::factory()->create();
     $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
     $product = Product::query()->create([
@@ -88,14 +88,19 @@ it('rejects checkout when requested quantity exceeds current stock', function ()
     $courier = ShippingCourier::query()->create(['name' => 'JNE', 'code' => 'jne', 'flat_cost' => 18000, 'is_active' => true]);
     $payment = PaymentMethod::query()->create(['name' => 'QRIS', 'code' => 'qris', 'is_active' => true]);
 
-    $this->actingAs($user)->post('/checkout', [
+    $checkoutData = [
         'recipient_name' => 'Test Buyer',
         'phone' => '08123456789',
         'address' => 'Jakarta',
         'shipping_courier_id' => $courier->id,
         'payment_method_id' => $payment->id,
-        'items' => [['variant_id' => $variant->id, 'qty' => 2]],
-    ])->assertStatus(422);
+        'items' => [['variant_id' => $variant->id, 'qty' => 1.4]],
+    ];
+
+    $this->actingAs($user)->post('/checkout', $checkoutData)->assertSessionHasErrors('items.0.qty');
+
+    $checkoutData['items'][0]['qty'] = 2;
+    $this->actingAs($user)->post('/checkout', $checkoutData)->assertStatus(422);
 
     $this->assertDatabaseCount('orders', 0);
     expect($variant->fresh()->stock)->toBe(1);
