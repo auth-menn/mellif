@@ -1,14 +1,23 @@
 import { router } from '@inertiajs/react';
+import { Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { store as loginStore } from '@/routes/login';
 import { store as registerStore } from '@/routes/register';
 import { redirect as googleRedirect } from '@/routes/google';
+import { request as passwordRequest } from '@/routes/password';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { mergeGuestCart } from '@/lib/cart-api';
 import { useTranslation } from '@/hooks/use-translation';
 
 type AuthMode = 'login' | 'register';
 type AuthResponse = { message?: string; errors?: Record<string, string[]> };
+
+function PasswordField({ label, value, onChange, autoComplete, error }: { label: string; value: string; onChange: (value: string) => void; autoComplete: string; error?: string }) {
+    const { t } = useTranslation();
+    const [isVisible, setIsVisible] = useState(false);
+
+    return <label className="block text-sm">{label}<span className="relative mt-1 block"><input type={isVisible ? 'text' : 'password'} autoComplete={autoComplete} required value={value} onChange={(event) => onChange(event.target.value)} className="w-full border border-neutral-300 px-3 py-2.5 pr-11" /><button type="button" aria-label={isVisible ? t('auth.hidePassword') : t('auth.showPassword')} aria-pressed={isVisible} onClick={() => setIsVisible((visible) => !visible)} className="absolute inset-y-0 right-0 grid w-11 place-items-center text-neutral-600 hover:text-black"><span aria-hidden="true">{isVisible ? <EyeOff size={18} /> : <Eye size={18} />}</span></button></span>{error && <span className="text-xs text-red-600">{error}</span>}</label>;
+}
 
 function readXsrfCookie(): string | undefined {
     const cookie = document.cookie.split('; ').find((item) => item.startsWith('XSRF-TOKEN='));
@@ -27,23 +36,33 @@ export default function AuthModal({ open, onOpenChange, onAuthenticated }: { ope
     const [processing, setProcessing] = useState(false);
 
     const finishAuthentication = useCallback(async (): Promise<void> => {
+        let guestCartSyncFailed = false;
         try {
             await mergeGuestCart();
-        } catch (error) {
-            setMessage(error instanceof Error ? error.message : 'Keranjang gagal digabungkan.');
-            return;
+        } catch {
+            guestCartSyncFailed = true;
         }
-        router.reload({ only: ['auth'], onSuccess: () => {
-            window.dispatchEvent(new Event('mellif-cart-updated'));
-            onOpenChange(false);
-            onAuthenticated?.();
-        } });
-    }, [onAuthenticated, onOpenChange]);
+        await new Promise<void>((resolve) => {
+            router.reload({
+                onSuccess: () => {
+                    window.dispatchEvent(new Event('mellif-cart-updated'));
+                    if (mode === 'login') {
+                        const successMessage = guestCartSyncFailed ? t('auth.loginSuccessCartWarning') : t('auth.loginSuccess');
+                        window.dispatchEvent(new CustomEvent('mellif-notification', { detail: successMessage }));
+                    }
+                    onOpenChange(false);
+                    onAuthenticated?.();
+                },
+                onFinish: () => resolve(),
+            });
+        });
+    }, [mode, onAuthenticated, onOpenChange, t]);
 
     useEffect(() => {
         const handlePopupAuth = (event: MessageEvent<unknown>): void => {
             if (event.origin !== window.location.origin || !event.data || typeof event.data !== 'object' || !('type' in event.data) || event.data.type !== 'mellif-auth-complete') return;
-            void finishAuthentication();
+            setProcessing(true);
+            void finishAuthentication().finally(() => setProcessing(false));
         };
         window.addEventListener('message', handlePopupAuth);
         return () => window.removeEventListener('message', handlePopupAuth);
@@ -91,5 +110,5 @@ export default function AuthModal({ open, onOpenChange, onAuthenticated }: { ope
         if (!popup) setMessage(t('auth.popupBlocked'));
     };
 
-    return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90svh] overflow-y-auto bg-white text-black"><DialogHeader><DialogTitle>{mode === 'login' ? t('auth.welcome') : t('auth.createAccount')}</DialogTitle><DialogDescription>{t('auth.description')}</DialogDescription></DialogHeader><button type="button" onClick={openGooglePopup} className="flex w-full items-center justify-center gap-3 border border-neutral-300 px-4 py-3 text-sm font-medium"><span aria-hidden="true" className="font-bold text-blue-600">G</span>{t('auth.google')}</button><div className="flex items-center gap-3 text-xs text-neutral-400"><span className="h-px flex-1 bg-neutral-200" />{t('auth.orEmail')}<span className="h-px flex-1 bg-neutral-200" /></div><div role="tablist" aria-label={t('nav.account')} className="grid grid-cols-2 border-b"><button role="tab" aria-selected={mode === 'login'} onClick={() => { setMode('login'); setErrors({}); setMessage(''); }} className={`py-3 text-sm ${mode === 'login' ? 'border-b-2 border-black font-medium' : 'text-neutral-500'}`}>{t('auth.login')}</button><button role="tab" aria-selected={mode === 'register'} onClick={() => { setMode('register'); setErrors({}); setMessage(''); }} className={`py-3 text-sm ${mode === 'register' ? 'border-b-2 border-black font-medium' : 'text-neutral-500'}`}>{t('auth.register')}</button></div><form onSubmit={submit} className="space-y-4">{mode === 'register' && <label className="block text-sm">{t('auth.name')}<input autoComplete="name" required value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full border border-neutral-300 px-3 py-2.5" />{errors.name && <span className="text-xs text-red-600">{errors.name}</span>}</label>}<label className="block text-sm">{t('auth.email')}<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 w-full border border-neutral-300 px-3 py-2.5" />{errors.email && <span className="text-xs text-red-600">{errors.email}</span>}</label><label className="block text-sm">{t('auth.password')}<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 w-full border border-neutral-300 px-3 py-2.5" />{errors.password && <span className="text-xs text-red-600">{errors.password}</span>}</label>{mode === 'register' && <label className="block text-sm">{t('auth.confirmPassword')}<input type="password" autoComplete="new-password" required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} className="mt-1 w-full border border-neutral-300 px-3 py-2.5" />{errors.password_confirmation && <span className="text-xs text-red-600">{errors.password_confirmation}</span>}</label>}{message && <p role="alert" className="text-sm text-red-700">{message}</p>}<button disabled={processing} className="w-full bg-black px-4 py-3 text-sm font-medium text-white disabled:opacity-50">{processing ? t('auth.processing') : mode === 'login' ? t('auth.login') : t('auth.createButton')}</button></form></DialogContent></Dialog>;
+    return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90svh] overflow-y-auto bg-white text-black"><DialogHeader><DialogTitle>{mode === 'login' ? t('auth.welcome') : t('auth.createAccount')}</DialogTitle><DialogDescription>{t('auth.description')}</DialogDescription></DialogHeader><button type="button" onClick={openGooglePopup} disabled={processing} className="flex w-full items-center justify-center gap-3 border border-neutral-300 px-4 py-3 text-sm font-medium disabled:opacity-50"><svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5 shrink-0"><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6c4.51-4.17 7.07-10.35 7.07-17.65z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.15 15.91-5.8l-7.73-6c-2.15 1.45-4.92 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.95 23.95 0 0 0 0 24c0 3.88.93 7.56 2.56 10.78l7.97-6.19z"/><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/></svg>{t('auth.google')}</button><div className="flex items-center gap-3 text-xs text-neutral-400"><span className="h-px flex-1 bg-neutral-200" />{t('auth.orEmail')}<span className="h-px flex-1 bg-neutral-200" /></div><div role="tablist" aria-label={t('nav.account')} className="grid grid-cols-2 border-b"><button role="tab" aria-selected={mode === 'login'} onClick={() => { setMode('login'); setErrors({}); setMessage(''); }} className={`py-3 text-sm ${mode === 'login' ? 'border-b-2 border-black font-medium' : 'text-neutral-500'}`}>{t('auth.login')}</button><button role="tab" aria-selected={mode === 'register'} onClick={() => { setMode('register'); setErrors({}); setMessage(''); }} className={`py-3 text-sm ${mode === 'register' ? 'border-b-2 border-black font-medium' : 'text-neutral-500'}`}>{t('auth.register')}</button></div><form onSubmit={submit} className="space-y-4">{mode === 'register' && <label className="block text-sm">{t('auth.name')}<input autoComplete="name" required value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full border border-neutral-300 px-3 py-2.5" />{errors.name && <span className="text-xs text-red-600">{errors.name}</span>}</label>}<label className="block text-sm">{t('auth.email')}<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 w-full border border-neutral-300 px-3 py-2.5" />{errors.email && <span className="text-xs text-red-600">{errors.email}</span>}</label><PasswordField label={t('auth.password')} value={password} onChange={setPassword} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} error={errors.password} />{mode === 'login' && <button type="button" onClick={() => { onOpenChange(false); router.visit(passwordRequest.url()); }} className="-mt-2 block text-left text-xs underline underline-offset-4 hover:text-neutral-500">{t('auth.forgotPassword')}</button>}{mode === 'register' && <PasswordField label={t('auth.confirmPassword')} value={passwordConfirmation} onChange={setPasswordConfirmation} autoComplete="new-password" error={errors.password_confirmation} />}{message && <p role="alert" className="text-sm text-red-700">{message}</p>}<button disabled={processing} className="flex w-full items-center justify-center gap-2 bg-black px-4 py-3 text-sm font-medium text-white disabled:opacity-50">{processing ? <><LoaderCircle size={16} className="animate-spin" />{t('auth.processing')}</> : mode === 'login' ? t('auth.login') : t('auth.createButton')}</button></form></DialogContent></Dialog>;
 }
