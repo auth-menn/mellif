@@ -4,13 +4,19 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Responses\AuthenticatedLoginResponse;
+use App\Models\User;
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
@@ -21,7 +27,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(LoginResponseContract::class, AuthenticatedLoginResponse::class);
     }
 
     /**
@@ -29,6 +35,30 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        ResetPassword::toMailUsing(function (User $user, string $token): MailMessage {
+            $resetUrl = url(route('password.reset.custom', [
+                'token' => $token,
+                'email' => $user->getEmailForPasswordReset(),
+            ], false));
+            $mailData = [
+                'name' => $user->name,
+                'resetUrl' => $resetUrl,
+                'logoVideoUrl' => asset('videos/mellif-logo.webm'),
+                'expiresIn' => config('auth.passwords.'.config('fortify.passwords').'.expire'),
+            ];
+
+            return (new MailMessage)
+                ->subject('Ubah password akun Mellif Studio')
+                ->view('emails.password-reset', $mailData)
+                ->text('emails.password-reset-text', $mailData);
+        });
+
+        RedirectIfAuthenticated::redirectUsing(
+            fn (Request $request): string => $request->user()?->is_admin
+                ? route('admin.dashboard')
+                : route('home'),
+        );
+
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
