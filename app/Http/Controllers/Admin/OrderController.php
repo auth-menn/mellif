@@ -44,7 +44,9 @@ class OrderController extends Controller
             if (in_array($newStatus, $terminalStatuses, true)) {
                 $lockedOrder->load('items');
                 foreach ($lockedOrder->items as $item) {
-                    $variant = ProductVariant::query()->lockForUpdate()->find($item->variant_id);
+                    $variant = $item->variant_id === null
+                        ? null
+                        : ProductVariant::query()->lockForUpdate()->find($item->variant_id);
                     $variant?->increment('stock', $item->qty);
                 }
             }
@@ -55,6 +57,6 @@ class OrderController extends Controller
             ]);
         });
 
-        return back()->with('success', 'Status pesanan diperbarui.');
+        return Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.orderUpdated'])->back();
     }
 }
