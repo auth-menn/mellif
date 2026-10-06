@@ -48,6 +48,13 @@ class SaveProductRequest extends FormRequest
         ];
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('discount_percent') === '') {
+            $this->merge(['discount_percent' => null]);
+        }
+    }
+
     protected function passedValidation(): void
     {
         $product = $this->route('product');
