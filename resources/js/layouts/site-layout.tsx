@@ -20,10 +20,12 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const isHome = url.split('?')[0] === '/';
     const isShop = url.split('?')[0] === '/shop';
     const isProduct = url.split('?')[0].startsWith('/shop/');
-    const hasFloatingNavbar = isHome || isShop || isProduct;
+    const isCheckout = url.split('?')[0] === '/checkout';
+    const hasFloatingNavbar = isHome || isShop || isProduct || isCheckout;
     const user = (props.auth as { user?: { id: number; name: string; is_admin?: boolean } | null } | undefined)?.user;
     const [menuOpen, setMenuOpen] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
+    const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
     const [authOpen, setAuthOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +157,14 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         }
     };
 
+    const confirmCheckout = (): void => {
+        setCheckoutConfirmOpen(false);
+        setCartOpen(false);
+        router.visit(checkoutShow.url());
+    };
+
+    const cartSubtotal = cart.reduce((sum, line) => sum + line.product.discounted_price * line.quantity, 0);
+
     const selectLanguage = (selectedLanguage: 'ID' | 'EN'): void => {
         setLanguage(selectedLanguage);
         setLanguageOpen(false);
@@ -230,12 +240,42 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             </aside>
             <aside className={`fixed inset-y-0 right-0 z-[51] flex w-[min(420px,92vw)] flex-col bg-white text-black shadow-xl transition-transform ${cartOpen ? 'translate-x-0' : 'translate-x-full'}`} aria-hidden={!cartOpen}>
                 <div className="flex items-center justify-between border-b p-6"><h2 className="text-lg font-semibold">{t('cart.title')} ({cartCount})</h2><button aria-label={t('common.close')} onClick={() => setCartOpen(false)}><X /></button></div>
-                <div className="flex-1 space-y-5 overflow-y-auto p-6 text-sm text-neutral-600">{cart.length === 0 ? <p>{t('cart.empty')}</p> : cart.map((line) => <div key={line.variant.id} className="flex gap-4"><img src={line.product.images[0] ?? '/storage/products/placeholder.svg'} alt="" className="h-24 w-20 bg-neutral-100 object-cover" /><div className="flex-1"><p className="font-medium text-black">{line.product.name}</p><p className="mt-1">{t('cart.size')} {line.variant.size} · {t('cart.quantity')} {line.quantity}</p><p className="mt-1 text-black">{money(line.product.discounted_price * line.quantity)}</p><button onClick={() => setPendingCartRemoval(line)} className="mt-2 text-xs underline">{t('cart.remove')}</button></div></div>)}</div>
-                <Link href={checkoutShow.url()} onClick={() => setCartOpen(false)} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white">{t('cart.checkout')}</Link>
+                <div className="flex-1 space-y-5 overflow-y-auto p-6 text-sm text-neutral-600">{cart.length === 0 ? <p>{t('cart.empty')}</p> : cart.map((line) => <div key={line.variant.id} className="flex gap-4 border-b border-neutral-200 pb-5 last:border-b-0 last:pb-0"><img src={line.product.images[0] ?? '/storage/products/placeholder.svg'} alt="" className="h-24 w-20 bg-neutral-100 object-cover" /><div className="min-w-0 flex-1"><p className="font-medium text-black">{line.product.name}</p><p className="mt-1">{t('cart.size')} {line.variant.size}</p><p className="mt-1 text-black">{money(line.product.discounted_price * line.quantity)}</p><button onClick={() => setPendingCartRemoval(line)} className="mt-2 text-xs text-red-600 underline transition-colors hover:text-red-800">{t('cart.remove')}</button></div><span aria-label={`${t('cart.quantity')}: ${line.quantity}`} className="grid size-7 shrink-0 place-items-center rounded-full bg-black text-xs text-white">{line.quantity}</span></div>)}</div>
+                <button type="button" disabled={!cart.length} onClick={() => setCheckoutConfirmOpen(true)} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{t('cart.checkout')}</button>
             </aside>
+            <Dialog open={checkoutConfirmOpen} onOpenChange={setCheckoutConfirmOpen}>
+                <DialogContent className="z-[90] bg-white text-neutral-900 sm:max-w-xl" overlayClassName="z-[80]">
+                    <DialogHeader>
+                        <DialogTitle>{t('checkout.confirmTitle')}</DialogTitle>
+                        <DialogDescription className="text-neutral-600">{t('checkout.confirmDescription')}</DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-64 space-y-4 overflow-y-auto">
+                        {cart.map((line) => (
+                            <div key={line.variant.id} className="flex items-center justify-between gap-4 text-sm">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <img src={line.product.images[0] ?? '/storage/products/placeholder.svg'} alt="" className="h-16 w-14 shrink-0 bg-neutral-100 object-cover" />
+                                    <div className="min-w-0">
+                                        <p className="line-clamp-2 font-medium">{line.product.name}</p>
+                                        <p className="text-xs text-neutral-600">{t('cart.size')} {line.variant.size} · {t('cart.quantity')} {line.quantity}</p>
+                                    </div>
+                                </div>
+                                <span className="shrink-0">{money(line.product.discounted_price * line.quantity)}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="flex justify-between border-t pt-4 text-sm font-semibold"><span>{t('checkout.subtotal')}</span><span>{money(cartSubtotal)}</span></p>
+                    <DialogFooter>
+                        <button type="button" onClick={() => setCheckoutConfirmOpen(false)} className="border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100">{t('common.cancel')}</button>
+                        <button type="button" onClick={confirmCheckout} className="bg-black px-4 py-2 text-sm text-white hover:bg-neutral-800">{t('cart.checkout')}</button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <CartRemoveDialog
                 open={pendingCartRemoval !== null}
                 productName={pendingCartRemoval?.product.name ?? ''}
+                productImage={pendingCartRemoval?.product.images[0] ?? '/storage/products/placeholder.svg'}
+                size={pendingCartRemoval?.variant.size ?? ''}
+                quantity={pendingCartRemoval?.quantity ?? 0}
                 title={t('cart.removeConfirmTitle')}
                 description={t('cart.removeConfirmDescription')}
                 confirmLabel={t('cart.confirmRemove')}
