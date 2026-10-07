@@ -1,9 +1,11 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { dashboard, login } from '@/routes';
+import { login, home } from '@/routes';
 import { register } from '@/routes';
+import { dashboard as adminDashboard } from '@/routes/admin';
 
 export default function Welcome() {
     const { auth } = usePage().props;
+    const isAdmin = Boolean((auth.user as { is_admin?: boolean } | null)?.is_admin);
 
     return (
         <>
@@ -13,7 +15,7 @@ export default function Welcome() {
                     <nav className="flex items-center justify-end gap-4">
                         {auth.user ? (
                             <Link
-                                href={dashboard()}
+                                href={isAdmin ? adminDashboard() : home()}
                                 className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
                             >
                                 Dashboard
