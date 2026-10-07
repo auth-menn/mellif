@@ -16,7 +16,11 @@ void createInertiaApp({
         switch (true) {
             case name === 'welcome':
                 return null;
+            case name.startsWith('errors/'):
+                return null;
             case name.startsWith('store/'):
+                return SiteLayout;
+            case name === 'settings/profile':
                 return SiteLayout;
             case name.startsWith('admin/'):
                 return AdminLayout;
