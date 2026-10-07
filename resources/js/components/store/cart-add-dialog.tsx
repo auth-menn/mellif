@@ -10,6 +10,7 @@ import {
 type CartAddDialogProps = {
     open: boolean;
     productName: string;
+    productImage: string;
     size: string;
     quantity: number;
     title: string;
@@ -24,6 +25,7 @@ type CartAddDialogProps = {
 export default function CartAddDialog({
     open,
     productName,
+    productImage,
     size,
     quantity,
     title,
@@ -37,7 +39,7 @@ export default function CartAddDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="z-[90] bg-white text-neutral-900"
+                className="z-[90] bg-white text-neutral-900 sm:max-w-xl"
                 overlayClassName="z-[80]"
             >
                 <DialogHeader>
@@ -46,11 +48,20 @@ export default function CartAddDialog({
                         {description}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-1 text-sm text-neutral-900">
-                    <p className="font-medium">{productName}</p>
-                    <p className="text-neutral-600">
-                        {size} · {quantity}
-                    </p>
+                <div className="grid grid-cols-[minmax(0,1fr)_96px] items-start gap-4 text-sm text-neutral-900 sm:grid-cols-[minmax(0,1fr)_128px]">
+                    <div className="space-y-1">
+                        <p className="font-medium">{productName}</p>
+                        <p className="text-neutral-600">
+                            {size} · {quantity}
+                        </p>
+                    </div>
+                    <div className="aspect-square overflow-hidden bg-neutral-100">
+                        <img
+                            src={productImage}
+                            alt={productName}
+                            className="h-full w-full object-cover"
+                        />
+                    </div>
                 </div>
                 <DialogFooter>
                     <button
