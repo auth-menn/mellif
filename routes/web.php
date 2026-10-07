@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\HomeSettingsController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ShippingCourierController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\GoogleController;
@@ -18,6 +19,10 @@ Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
 Route::get('/shop/{product:slug}', [StorefrontController::class, 'product'])->name('shop.show');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('auth')->name('checkout.store');
+Route::get('/akun/reset-password/{token}', [PasswordResetController::class, 'show'])->name('password.reset.custom');
+Route::post('/akun/reset-password', [PasswordResetController::class, 'update'])
+    ->middleware('throttle:6,1')
+    ->name('password.reset.custom.update');
 Route::middleware('auth')->prefix('cart')->name('cart.')->group(function () {
     Route::get('/', [CartController::class, 'index'])->name('index');
     Route::post('/sync', [CartController::class, 'sync'])->name('sync');
@@ -30,8 +35,9 @@ Route::middleware('guest')->prefix('auth/google')->name('google.')->group(functi
     Route::get('/callback', [GoogleController::class, 'callback'])->name('callback');
 });
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
+    Route::patch('products/{product}/status', [ProductController::class, 'updateStatus'])->name('products.status');
     Route::resource('products', ProductController::class);
     Route::resource('categories', CategoryController::class);
     Route::resource('shipping', ShippingCourierController::class);
@@ -40,10 +46,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('orders/{order}', [OrderController::class, 'update'])->name('orders.update');
     Route::get('home-settings', [HomeSettingsController::class, 'edit'])->name('home-settings.edit');
     Route::put('home-settings', [HomeSettingsController::class, 'update'])->name('home-settings.update');
-});
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
 });
 
 require __DIR__.'/settings.php';
