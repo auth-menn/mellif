@@ -25,7 +25,8 @@ class CartController extends Controller
         $item = DB::transaction(function () use ($data, $request): CartItem {
             $variant = $this->availableVariant($data['variant_id'], $data['quantity']);
             $item = CartItem::query()->whereBelongsTo($request->user())->where('product_variant_id', $variant->id)->lockForUpdate()->first();
-            $quantity = min($variant->stock, ($item?->quantity ?? 0) + $data['quantity']);
+            $quantity = ($item?->quantity ?? 0) + $data['quantity'];
+            abort_unless($quantity <= $variant->stock, 422, 'Stok produk tidak mencukupi.');
 
             return $request->user()->cartItems()->updateOrCreate(
                 ['product_variant_id' => $variant->id],
