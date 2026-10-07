@@ -1,17 +1,22 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import adminRoutes from '@/routes/admin';
+import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 
 type HomeMedia = {
     path: string;
     url: string;
+    productId: number | null;
 };
+
+type ProductOption = { id: number; name: string; slug: string };
 
 type HomeSettingsProps = {
     heroVideos: HomeMedia[];
     page2Images: HomeMedia[];
+    products: ProductOption[];
 };
 
 function UploadPreview({ file, type, onRemove, removeLabel }: { file: File; type: 'image' | 'video'; onRemove: () => void; removeLabel: string }) {
@@ -57,32 +62,32 @@ function appendFiles(current: File[], selected: File[]): File[] {
     return files;
 }
 
-export default function HomeSettingsEdit({ heroVideos, page2Images }: HomeSettingsProps) {
+export default function HomeSettingsEdit({ heroVideos, page2Images, products }: HomeSettingsProps) {
     const { t } = useTranslation();
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const form = useForm({
         hero_videos: [] as File[],
         remove_hero_video_indexes: [] as number[],
         page2_images: [] as File[],
+        page2_product_ids: page2Images.map((image) => image.productId?.toString() ?? ''),
+        page2_upload_product_ids: [] as string[],
         remove_page2_image_indexes: [] as number[],
     });
 
     const submit = (event: React.FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
+        setConfirmOpen(true);
+    };
+
+    const saveSettings = (): void => {
         form.transform((data) => ({ ...data, _method: 'put' }));
-        form.post(adminRoutes.homeSettings.update.url(), { forceFormData: true });
+        form.post(adminRoutes.homeSettings.update.url(), { forceFormData: true, onFinish: () => setConfirmOpen(false) });
     };
 
     return (
         <>
             <Head title={t('admin.homeSettings')} />
-            <div className="mb-6 flex items-center justify-between">
-                <h1 className="text-3xl font-medium text-foreground">{t('admin.homeSettings')}</h1>
-                <Link href={adminRoutes.dashboard.url()} className="text-sm text-primary underline underline-offset-2">
-                    {t('admin.dashboardLink')}
-                </Link>
-            </div>
-
-            <form onSubmit={submit} className="max-w-5xl space-y-7 border border-border bg-card p-5 text-foreground md:p-8">
+            <form onSubmit={submit} className="w-full space-y-7 border border-border bg-card p-5 text-foreground md:p-8">
                 <fieldset className="space-y-4 border border-border p-4 md:p-5">
                     <legend className="px-2 text-lg font-medium">{t('admin.pageOneVideos')}</legend>
                     <label className="block text-sm">
@@ -132,6 +137,8 @@ export default function HomeSettingsEdit({ heroVideos, page2Images }: HomeSettin
                             accept="image/jpeg,image/png,image/webp"
                             onChange={(event) => {
                                 form.setData('page2_images', appendFiles(form.data.page2_images, Array.from(event.currentTarget.files ?? [])));
+                                const addedFiles = appendFiles(form.data.page2_images, Array.from(event.currentTarget.files ?? [])).slice(form.data.page2_images.length);
+                                form.setData('page2_upload_product_ids', [...form.data.page2_upload_product_ids, ...addedFiles.map(() => '')]);
                                 event.currentTarget.value = '';
                             }}
                             className="mt-2 block w-full border border-input bg-card p-3 text-foreground"
@@ -141,7 +148,7 @@ export default function HomeSettingsEdit({ heroVideos, page2Images }: HomeSettin
                     {form.errors['page2_images.0'] && <p className="text-xs text-destructive">{form.errors['page2_images.0']}</p>}
                     {form.data.page2_images.length > 0 && (
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                            {form.data.page2_images.map((file, index) => <UploadPreview key={`${file.name}-${file.lastModified}-${index}`} file={file} type="image" removeLabel={t('admin.removeOnSave')} onRemove={() => form.setData('page2_images', form.data.page2_images.filter((_, fileIndex) => fileIndex !== index))} />)}
+                            {form.data.page2_images.map((file, index) => <div key={`${file.name}-${file.lastModified}-${index}`} className="space-y-2"><UploadPreview file={file} type="image" removeLabel={t('admin.removeOnSave')} onRemove={() => { form.setData('page2_images', form.data.page2_images.filter((_, fileIndex) => fileIndex !== index)); form.setData('page2_upload_product_ids', form.data.page2_upload_product_ids.filter((_, productIndex) => productIndex !== index)); }} /><label className="block text-xs">{t('admin.linkProduct')}<select value={form.data.page2_upload_product_ids[index] ?? ''} onChange={(event) => form.setData('page2_upload_product_ids', form.data.page2_upload_product_ids.map((id, productIndex) => productIndex === index ? event.target.value : id))} className="mt-1 w-full border border-input bg-card p-2 text-foreground"><option value="">{t('admin.noLinkedProduct')}</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label></div>)}
                         </div>
                     )}
                     {page2Images.length === 0 ? (
@@ -155,6 +162,7 @@ export default function HomeSettingsEdit({ heroVideos, page2Images }: HomeSettin
                                     </button>
                                     <img src={image.url} alt="" className="aspect-[3/4] w-full object-cover" />
                                     <span className="block break-all text-xs text-muted-foreground">{image.path}</span>
+                                    <label className="block text-xs">{t('admin.linkProduct')}<select value={form.data.page2_product_ids[index] ?? ''} onChange={(event) => form.setData('page2_product_ids', form.data.page2_product_ids.map((id, productIndex) => productIndex === index ? event.target.value : id))} className="mt-1 w-full border border-input bg-card p-2 text-foreground"><option value="">{t('admin.noLinkedProduct')}</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
                                 </div>
                             ))}
                         </div>
@@ -165,6 +173,7 @@ export default function HomeSettingsEdit({ heroVideos, page2Images }: HomeSettin
                     {form.processing ? t('admin.saving') : t('admin.saveHome')}
                 </button>
             </form>
+            <ConfirmDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={saveSettings} processing={form.processing} title={t('admin.confirmTitle')} description={t('admin.confirmUpdate')} confirmLabel={t('admin.confirm')} cancelLabel={t('common.cancel')} />
         </>
     );
 }
