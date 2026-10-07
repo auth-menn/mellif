@@ -11,7 +11,7 @@ export default function ProductCard({ product, onBuy, stackDiscountPrice = false
     return (
         <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-md border border-neutral-100 bg-white">
             <Link href={detailUrl} onClick={() => recordRecentlyViewed(product)} className="relative block aspect-square shrink-0 overflow-hidden bg-[#c7c7c7]">
-                <img src={product.images[0] ?? '/storage/products/placeholder.svg'} alt={product.name} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+                <img src={product.images[0] ?? '/storage/products/placeholder.svg'} alt={product.name} className="absolute inset-0 h-full w-full object-cover" />
                 {product.images[1] && <img src={product.images[1]} alt={`${product.name} 2`} className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100" />}
                 {product.discount_percent !== null && <span className="absolute right-2 top-2 bg-red-600 px-1.5 py-1 text-[10px] font-semibold text-white">{product.discount_percent}%</span>}
                 {product.stock <= 5 && <span className="absolute left-2 top-2 bg-neutral-500 px-2 py-1 text-[10px] font-semibold text-white">{product.stock === 0 ? t('product.soldOut') : t('product.lowStock')}</span>}
