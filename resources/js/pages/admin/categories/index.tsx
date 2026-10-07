@@ -1,17 +1,209 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import adminRoutes from '@/routes/admin';
 import { useTranslation } from '@/hooks/use-translation';
+import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 
-type Category = { id: number; name: string; slug: string; sort_order: number; products_count: number };
-type Page<T> = { data: T[]; links: { url: string | null; label: string; active: boolean }[] };
+type Category = {
+    id: number;
+    name: string;
+    slug: string;
+    sort_order: number;
+    products_count: number;
+};
+type PendingCategory = Category | null;
 
-export default function CategoriesIndex({ categories, editing }: { categories: Page<Category>; editing: Category | null }) {
+function slugPreview(name: string): string {
+    return name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
+export default function CategoriesIndex({
+    categories,
+    editing,
+}: {
+    categories: { data: Category[] };
+    editing: Category | null;
+}) {
     const { t } = useTranslation();
-    const form = useForm({ name: editing?.name ?? '', slug: editing?.slug ?? '', sort_order: editing?.sort_order ?? 0 });
-    const submit = (event: React.FormEvent<HTMLFormElement>): void => {
+    const [pendingDelete, setPendingDelete] = useState<PendingCategory>(null);
+    const [confirmSave, setConfirmSave] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const form = useForm({
+        name: editing?.name ?? '',
+    });
+
+    const save = (event: React.FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
-        if (editing) form.put(adminRoutes.categories.update.url({ category: editing.id }));
-        else form.post(adminRoutes.categories.store.url());
+        setConfirmSave(true);
     };
-    return <><Head title={`${t('admin.categories')} — CMS Mellif Studio`} /><div className="mb-6 flex items-center justify-between"><h1 className="text-3xl font-medium">{t('admin.categories')}</h1><Link href={adminRoutes.categories.index.url()} className="text-sm underline">{t('admin.newCategory')}</Link></div><div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]"><section className="overflow-x-auto border bg-card"><table className="w-full text-left text-sm"><thead className="bg-muted"><tr><th className="p-4">{t('admin.name')}</th><th className="p-4">{t('admin.slug')}</th><th className="p-4">{t('admin.productCount')}</th><th className="p-4">{t('admin.action')}</th></tr></thead><tbody>{categories.data.map((category) => <tr key={category.id} className="border-t"><td className="p-4">{category.name}</td><td className="p-4">{category.slug}</td><td className="p-4">{category.products_count}</td><td className="p-4"><Link href={adminRoutes.categories.index.url({ query: { edit: category.id } })} className="mr-3 underline">{t('admin.edit')}</Link><button className="text-destructive underline" onClick={() => { if (window.confirm(`${t('admin.deleteCategoryConfirm')} ${category.name}?`)) router.delete(adminRoutes.categories.destroy.url({ category: category.id })); }}>{t('admin.delete')}</button></td></tr>)}</tbody></table></section><form onSubmit={submit} className="h-fit space-y-4 border bg-card p-5"><h2 className="font-medium">{editing ? t('admin.edit') : t('admin.newCategory')}</h2><label className="block text-sm">{t('admin.name')}<input value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} className="mt-2 w-full border p-3" /></label><label className="block text-sm">{t('admin.slug')}<input value={form.data.slug} onChange={(event) => form.setData('slug', event.target.value)} placeholder={t('admin.autoSlug')} className="mt-2 w-full border p-3" /></label><label className="block text-sm">{t('admin.order')}<input type="number" min={0} value={form.data.sort_order} onChange={(event) => form.setData('sort_order', Number(event.target.value))} className="mt-2 w-full border p-3" /></label><button className="bg-primary px-5 py-3 text-sm text-primary-foreground">{t('admin.save')}</button></form></div></>;
+
+    const confirmSaveAction = (): void => {
+        setProcessing(true);
+        const options = {
+            onFinish: () => {
+                setProcessing(false);
+                setConfirmSave(false);
+            },
+        };
+        if (editing)
+            form.put(
+                adminRoutes.categories.update.url({ category: editing.id }),
+                options,
+            );
+        else form.post(adminRoutes.categories.store.url(), options);
+    };
+
+    const confirmDeleteAction = (): void => {
+        if (!pendingDelete) return;
+        setProcessing(true);
+        router.delete(
+            adminRoutes.categories.destroy.url({ category: pendingDelete.id }),
+            {
+                onFinish: () => {
+                    setProcessing(false);
+                    setPendingDelete(null);
+                },
+            },
+        );
+    };
+
+    return (
+        <>
+            <Head title={`${t('admin.categories')} — CMS Mellif Studio`} />
+            <div className="mb-6 flex justify-end">
+                <Link
+                    href={adminRoutes.categories.index.url()}
+                    className="text-sm text-primary underline"
+                >
+                    {t('admin.newCategory')}
+                </Link>
+            </div>
+            <div className="space-y-6">
+                <section className="overflow-x-auto border border-border bg-card">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-muted text-muted-foreground">
+                            <tr>
+                                <th className="p-4">{t('admin.name')}</th>
+                                <th className="p-4">{t('admin.slug')}</th>
+                                <th className="p-4">
+                                    {t('admin.productCount')}
+                                </th>
+                                <th className="p-4">{t('admin.action')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {categories.data.map((category) => (
+                                <tr
+                                    key={category.id}
+                                    className="border-t border-border"
+                                >
+                                    <td className="p-4 text-foreground">
+                                        {category.name}
+                                    </td>
+                                    <td className="p-4 text-foreground">
+                                        {category.slug}
+                                    </td>
+                                    <td className="p-4 text-foreground">
+                                        {category.products_count}
+                                    </td>
+                                    <td className="p-4">
+                                        <Link
+                                            href={adminRoutes.categories.index.url(
+                                                {
+                                                    query: {
+                                                        edit: category.id,
+                                                    },
+                                                },
+                                            )}
+                                            className="mr-3 font-medium text-primary underline"
+                                        >
+                                            {t('admin.edit')}
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className="text-destructive underline"
+                                            onClick={() =>
+                                                setPendingDelete(category)
+                                            }
+                                        >
+                                            {t('admin.delete')}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {categories.data.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={4}
+                                        className="p-6 text-center text-muted-foreground"
+                                    >
+                                        {t('admin.noCategories')}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </section>
+                <form
+                    onSubmit={save}
+                    className="w-full space-y-4 border border-border bg-card p-5 text-foreground"
+                >
+                    <h2 className="font-medium">
+                        {editing ? t('admin.edit') : t('admin.newCategory')}
+                    </h2>
+                    <label className="block text-sm">
+                        {t('admin.name')}
+                        <input
+                            value={form.data.name}
+                            onChange={(event) =>
+                                form.setData('name', event.target.value)
+                            }
+                            className="mt-2 w-full border border-input bg-card p-3 text-foreground"
+                        />
+                        <span className="mt-2 block text-xs text-muted-foreground">
+                            {t('admin.slug')}: <code>{slugPreview(form.data.name) || '—'}</code>
+                        </span>
+                    </label>
+                    <button
+                        disabled={form.processing}
+                        className="bg-primary px-5 py-3 text-sm text-primary-foreground disabled:opacity-50"
+                    >
+                        {t('admin.save')}
+                    </button>
+                </form>
+            </div>
+            <ConfirmDialog
+                open={confirmSave}
+                onOpenChange={setConfirmSave}
+                onConfirm={confirmSaveAction}
+                processing={processing}
+                title={t('admin.confirmTitle')}
+                description={
+                    editing
+                        ? t('admin.confirmUpdate')
+                        : t('admin.confirmCreate')
+                }
+                confirmLabel={t('admin.confirm')}
+                cancelLabel={t('common.cancel')}
+            />
+            <ConfirmDialog
+                open={pendingDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open && !processing) setPendingDelete(null);
+                }}
+                onConfirm={confirmDeleteAction}
+                processing={processing}
+                destructive
+                title={t('admin.confirmTitle')}
+                description={t('admin.confirmDelete')}
+                confirmLabel={t('admin.delete')}
+                cancelLabel={t('common.cancel')}
+            />
+        </>
+    );
 }
