@@ -1,12 +1,13 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
-import { index as shopIndex } from '@/routes/shop';
+import { index as shopIndex, show as shopShow } from '@/routes/shop';
 
 type HomeSlide = {
     id: number;
     imageUrl: string;
     alt: string;
+    productUrl?: string | null;
 };
 
 const fallbackSlides: HomeSlide[] = [
@@ -23,12 +24,13 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
     const carouselRef = useRef<HTMLElement>(null);
     const carouselFrameRef = useRef<HTMLDivElement>(null);
     const dragState = useRef<number | null>(null);
+    const suppressSlideClick = useRef(false);
     const pendingDirection = useRef<-1 | 1 | null>(null);
     const [activeSlide, setActiveSlide] = useState(0);
     const [carouselVisible, setCarouselVisible] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
-    const [hasInteracted, setHasInteracted] = useState(false);
+    const [carouselAspectRatio, setCarouselAspectRatio] = useState(1);
     const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
     const [heroVisible, setHeroVisible] = useState(false);
     const slides = productSlides.length > 0 ? productSlides : fallbackSlides;
@@ -76,10 +78,8 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
 
     useEffect(() => {
         const frame = heroFrameRef.current;
-        const carouselFrame = carouselFrameRef.current;
-        const carousel = carouselRef.current;
 
-        if (!frame || !carouselFrame || !carousel) {
+        if (!frame) {
             return;
         }
 
@@ -101,12 +101,6 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                 frame.style.clipPath = `path("M ${sideInset + cornerRadius} 0 H ${frameWidth - sideInset - cornerRadius} Q ${frameWidth - sideInset} 0 ${frameWidth - sideInset} ${cornerRadius} V ${frameHeight} H ${sideInset} V ${cornerRadius} Q ${sideInset} 0 ${sideInset + cornerRadius} 0 Z")`;
                 frame.style.transform = `scale(${1 + progress * 0.025})`;
 
-                const carouselProgress = Math.min(1, Math.max(0, (window.innerHeight - carousel.getBoundingClientRect().top) / (window.innerHeight * 0.35)));
-                const carouselInset = Math.max(0, Math.min(40, window.innerWidth * 0.03) * (1 - carouselProgress));
-                const carouselRadius = 68 * (1 - carouselProgress);
-
-                carouselFrame.style.clipPath = `inset(0 ${carouselInset}px 0 ${carouselInset}px round ${carouselRadius}px)`;
-                carouselFrame.style.transform = `scale(${1 + carouselProgress * 0.02})`;
             });
         };
 
@@ -182,29 +176,25 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
     }, []);
 
     useEffect(() => {
-        if (!carouselVisible || isDragging || hasInteracted || slides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (!carouselVisible || isDragging || slides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             return;
         }
 
-        let interval = 0;
-        const startAutoplay = window.setTimeout(() => {
-            interval = window.setInterval(() => {
-                transitionSlide(1);
-            }, 2000);
-        }, 4000);
+        const nextSlide = window.setTimeout(() => {
+            transitionSlide(1);
+        }, 5000);
 
         return () => {
-            window.clearTimeout(startAutoplay);
-            window.clearInterval(interval);
+            window.clearTimeout(nextSlide);
         };
-    }, [carouselVisible, hasInteracted, isDragging, slides.length, transitionSlide]);
+    }, [activeSlide, carouselVisible, isDragging, slides.length, transitionSlide]);
 
     return (
         <>
             <Head title={t('home.title')} />
-            <main className="bg-white">
-                <section className="relative h-[130svh] bg-black" aria-label={t('home.collection')}>
-                    <div className="sticky top-14 mx-auto h-[calc(100svh-56px)] w-full md:top-16 md:h-[calc(100svh-64px)]">
+            <main className="overflow-x-clip bg-white">
+                <section className="relative h-[115svh] bg-black sm:h-[120svh] landscape:max-xl:h-[110svh] xl:h-[130svh]" aria-label={t('home.collection')}>
+                    <div className="sticky top-12 mx-auto h-[calc(100svh-3rem)] w-full sm:top-14 sm:h-[calc(100svh-3.5rem)] md:top-16 md:h-[calc(100svh-4rem)] landscape:max-xl:top-12 landscape:max-xl:h-[calc(100svh-3rem)]">
                         <Link href={shopIndex.url()} aria-label={t('nav.shop')} className="absolute inset-0 z-10 cursor-pointer" />
                         <div ref={heroFrameRef} className="absolute inset-0 overflow-hidden bg-neutral-900 [will-change:clip-path,transform]">
                             <video
@@ -227,12 +217,13 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
 
                 <section
                     ref={carouselRef}
-                    className="relative isolate grid min-h-[100svh] cursor-grab touch-pan-y select-none place-items-center overflow-hidden bg-white active:cursor-grabbing"
+                    className="relative isolate w-full cursor-grab touch-pan-y select-none overflow-hidden bg-white active:cursor-grabbing"
                     aria-label={t('home.collection')}
                 >
                     <div
                         ref={carouselFrameRef}
-                        className="absolute inset-0 cursor-grab overflow-hidden bg-black [will-change:clip-path,transform] active:cursor-grabbing"
+                        className="relative w-full cursor-grab overflow-hidden bg-black active:cursor-grabbing"
+                        style={{ aspectRatio: carouselAspectRatio }}
                         onPointerDown={(event) => {
                             if (event.button !== 0) {
                                 return;
@@ -244,14 +235,40 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                             }
 
                             dragState.current = event.clientX;
+                            suppressSlideClick.current = false;
                             event.currentTarget.setPointerCapture(event.pointerId);
                             event.currentTarget.style.setProperty('--drag-offset', '0px');
                             setIsDragging(true);
                         }}
+                        role={slides[activeSlide].productUrl ? 'link' : undefined}
+                        tabIndex={slides[activeSlide].productUrl ? 0 : undefined}
+                        aria-label={slides[activeSlide].productUrl ? slides[activeSlide].alt : undefined}
+                        onClick={(event) => {
+                            if (suppressSlideClick.current) {
+                                event.preventDefault();
+                                suppressSlideClick.current = false;
+
+                                return;
+                            }
+
+                            const productUrl = slides[activeSlide].productUrl;
+
+                            if (productUrl) {
+                                router.visit(shopShow.url({ product: productUrl }));
+                            }
+                        }}
+                        onKeyDown={(event) => {
+                            const productUrl = slides[activeSlide].productUrl;
+
+                            if (productUrl && (event.key === 'Enter' || event.key === ' ')) {
+                                event.preventDefault();
+                                router.visit(shopShow.url({ product: productUrl }));
+                            }
+                        }}
                         onPointerMove={(event) => {
                             if (dragState.current !== null) {
                                 if (Math.abs(event.clientX - dragState.current) > 3) {
-                                    setHasInteracted(true);
+                                    suppressSlideClick.current = true;
                                 }
 
                                 const frameWidth = event.currentTarget.clientWidth;
@@ -311,7 +328,12 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                                         aria-hidden={relativeIndex !== 0}
                                         fetchPriority={relativeIndex === 0 ? 'high' : 'low'}
                                         decoding="async"
-                                        className="pointer-events-none h-full w-full select-none object-cover"
+                                        onLoad={(event) => {
+                                            if (relativeIndex === 0) {
+                                                setCarouselAspectRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight);
+                                            }
+                                        }}
+                                        className="pointer-events-none h-full w-full select-none object-contain"
                                     />
                                 </div>
                             );
