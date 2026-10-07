@@ -11,15 +11,18 @@ type Props = {
     token: string;
     email: string;
     passwordRules: string;
+    resetPasswordUrl?: string;
 };
 
-export default function ResetPassword({ token, email, passwordRules }: Props) {
+export default function ResetPassword({ token, email, passwordRules, resetPasswordUrl }: Props) {
     return (
         <>
             <Head title="Reset password" />
 
             <Form
-                {...update.form()}
+                {...(resetPasswordUrl
+                    ? { action: resetPasswordUrl, method: 'post' as const }
+                    : update.form())}
                 transform={(data) => ({ ...data, token, email })}
                 resetOnSuccess={['password', 'password_confirmation']}
             >
