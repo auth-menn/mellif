@@ -43,11 +43,19 @@ class OrderController extends Controller
 
             if (in_array($newStatus, $terminalStatuses, true)) {
                 $lockedOrder->load('items');
-                foreach ($lockedOrder->items as $item) {
-                    $variant = $item->variant_id === null
-                        ? null
-                        : ProductVariant::query()->lockForUpdate()->find($item->variant_id);
-                    $variant?->increment('stock', $item->qty);
+                $quantitiesByVariant = $lockedOrder->items
+                    ->whereNotNull('variant_id')
+                    ->groupBy('variant_id')
+                    ->map(fn ($items): int => $items->sum('qty'));
+                $variants = ProductVariant::query()
+                    ->whereIn('id', $quantitiesByVariant->keys())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($quantitiesByVariant as $variantId => $quantity) {
+                    $variants->get((int) $variantId)?->increment('stock', $quantity);
                 }
             }
 

@@ -23,7 +23,7 @@ class SyncCartRequest extends FormRequest
     {
         return [
             'items' => ['present', 'array', 'max:50'],
-            'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
+            'items.*.variant_id' => ['required', 'integer', 'min:1'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
         ];
     }

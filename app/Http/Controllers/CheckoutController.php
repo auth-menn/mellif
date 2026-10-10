@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PlaceOrderRequest;
 use App\Models\CartItem;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\PaymentMethod;
 use App\Models\ProductVariant;
 use App\Models\ShippingCourier;
@@ -32,16 +33,33 @@ class CheckoutController extends Controller
         $order = DB::transaction(function () use ($data, $request): Order {
             $courier = ShippingCourier::query()->whereKey($data['shipping_courier_id'])->where('is_active', true)->firstOrFail();
             $paymentMethod = PaymentMethod::query()->whereKey($data['payment_method_id'])->where('is_active', true)->firstOrFail();
-            $lockedVariants = collect($data['items'])->map(function (array $item): array {
-                $variant = ProductVariant::query()->with('product')->lockForUpdate()->findOrFail($item['variant_id']);
-                if (! $variant->product->is_active || $variant->stock < $item['qty']) {
+            $items = collect($data['items']);
+            $quantitiesByVariant = $items->groupBy('variant_id')->map(fn ($variantItems): int => $variantItems->sum('qty'));
+            $variants = ProductVariant::query()
+                ->with('product')
+                ->whereIn('id', $quantitiesByVariant->keys())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            if ($variants->count() !== $quantitiesByVariant->count()) {
+                abort(422, 'Produk berubah. Perbarui keranjang Anda.');
+            }
+
+            foreach ($quantitiesByVariant as $variantId => $quantity) {
+                $variant = $variants->get((int) $variantId);
+
+                if (! $variant->product->is_active || $variant->stock < $quantity) {
                     abort(422, 'Stok produk berubah. Perbarui keranjang Anda.');
                 }
+            }
 
-                return [$variant, $item['qty']];
+            $subtotal = $items->sum(function (array $item) use ($variants): int {
+                $variant = $variants->get((int) $item['variant_id']);
+
+                return $variant->product->discounted_price * $item['qty'];
             });
-
-            $subtotal = $lockedVariants->sum(fn (array $line): int => $line[0]->product->discounted_price * $line[1]);
             $order = Order::query()->create([
                 'user_id' => $request->user()->id,
                 'order_number' => 'MLF-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
@@ -52,17 +70,26 @@ class CheckoutController extends Controller
                 'total' => $subtotal + $courier->flat_cost, 'status' => 'pending_payment',
             ]);
 
-            foreach ($lockedVariants as [$variant, $quantity]) {
-                $variant->decrement('stock', $quantity);
-                $order->items()->create([
-                    'product_id' => $variant->product_id, 'variant_id' => $variant->id,
-                    'product_name' => $variant->product->name, 'size' => $variant->size,
-                    'qty' => $quantity, 'unit_price' => $variant->product->discounted_price,
-                ]);
+            foreach ($quantitiesByVariant as $variantId => $quantity) {
+                $variants->get((int) $variantId)->decrement('stock', $quantity);
             }
 
+            $timestamp = now();
+            OrderItem::query()->insert($items->map(function (array $item) use ($order, $variants, $timestamp): array {
+                $variant = $variants->get((int) $item['variant_id']);
+
+                return [
+                    'order_id' => $order->id,
+                    'product_id' => $variant->product_id,
+                    'variant_id' => $variant->id,
+                    'product_name' => $variant->product->name, 'size' => $variant->size,
+                    'qty' => $item['qty'], 'unit_price' => $variant->product->discounted_price,
+                    'created_at' => $timestamp, 'updated_at' => $timestamp,
+                ];
+            })->all());
+
             CartItem::query()->whereBelongsTo($request->user())
-                ->whereIn('product_variant_id', $lockedVariants->map(fn (array $line): int => $line[0]->id))
+                ->whereIn('product_variant_id', $quantitiesByVariant->keys())
                 ->delete();
 
             return $order;

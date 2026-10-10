@@ -29,8 +29,8 @@ class PlaceOrderRequest extends FormRequest
             'address_detail' => ['nullable', 'string', 'max:1000'],
             'shipping_courier_id' => ['required', 'exists:shipping_couriers,id'],
             'payment_method_id' => ['required', 'exists:payment_methods,id'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
+            'items' => ['required', 'array', 'min:1', 'max:50'],
+            'items.*.variant_id' => ['required', 'integer', 'min:1'],
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
         ];
     }

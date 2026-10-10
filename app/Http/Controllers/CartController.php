@@ -60,22 +60,56 @@ class CartController extends Controller
 
     public function sync(SyncCartRequest $request): JsonResponse
     {
-        DB::transaction(function () use ($request): void {
-            foreach ($request->validated('items') as $item) {
-                $variant = ProductVariant::query()->with('product')->lockForUpdate()->findOrFail($item['variant_id']);
-                if (! $variant->product->is_active || $variant->stock < 1) {
-                    continue;
+        $itemsByVariant = collect($request->validated('items'))
+            ->groupBy('variant_id')
+            ->map(fn ($items): int => $items->sum('quantity'));
+
+        if ($itemsByVariant->isNotEmpty()) {
+            DB::transaction(function () use ($request, $itemsByVariant): void {
+                $variants = ProductVariant::query()
+                    ->with('product')
+                    ->whereIn('id', $itemsByVariant->keys())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                if ($variants->count() !== $itemsByVariant->count()) {
+                    abort(422, 'Produk berubah. Perbarui keranjang Anda.');
                 }
 
-                $cartItem = CartItem::query()->whereBelongsTo($request->user())
-                    ->where('product_variant_id', $variant->id)->lockForUpdate()->first();
-                $quantity = min($variant->stock, ($cartItem?->quantity ?? 0) + $item['quantity']);
-                $request->user()->cartItems()->updateOrCreate(
-                    ['product_variant_id' => $variant->id],
-                    ['quantity' => $quantity],
-                );
-            }
-        });
+                $existingCartItems = CartItem::query()
+                    ->whereBelongsTo($request->user())
+                    ->whereIn('product_variant_id', $itemsByVariant->keys())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('product_variant_id');
+                $timestamp = now();
+                $rows = [];
+
+                foreach ($itemsByVariant as $variantId => $requestedQuantity) {
+                    $variant = $variants->get((int) $variantId);
+
+                    if (! $variant->product->is_active || $variant->stock < 1) {
+                        continue;
+                    }
+
+                    $existingQuantity = $existingCartItems->get($variant->id)?->quantity ?? 0;
+                    $rows[] = [
+                        'user_id' => $request->user()->id,
+                        'product_variant_id' => $variant->id,
+                        'quantity' => min($variant->stock, $existingQuantity + $requestedQuantity),
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
+                    ];
+                }
+
+                if ($rows !== []) {
+                    CartItem::query()->upsert($rows, ['user_id', 'product_variant_id'], ['quantity', 'updated_at']);
+                }
+            });
+        }
 
         return response()->json(['items' => $this->cartItems($request->user())]);
     }
