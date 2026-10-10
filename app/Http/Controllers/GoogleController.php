@@ -11,9 +11,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class GoogleController extends Controller
 {
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
-        return Socialite::driver('google')->with(['prompt' => 'select_account'])->redirect();
+        $response = Socialite::driver('google')->with(['prompt' => 'select_account'])->redirect();
+
+        $request->session()->save();
+
+        return $response;
     }
 
     public function callback(Request $request): Response
