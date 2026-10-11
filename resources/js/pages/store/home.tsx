@@ -333,7 +333,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                                                 setCarouselAspectRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight);
                                             }
                                         }}
-                                        className="pointer-events-none h-full w-full select-none object-contain"
+                                        className="home-carousel-image pointer-events-none h-full w-full select-none object-contain"
                                     />
                                 </div>
                             );

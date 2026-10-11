@@ -23,7 +23,12 @@
 
 @media (max-width: 767px), (min-width: 768px) and (max-width: 1023px) and (orientation: portrait) {
     .home-carousel-frame {
-        aspect-ratio: 9 / 16;
+        aspect-ratio: auto;
+        height: 100svh;
+    }
+
+    .home-carousel-image {
+        object-fit: cover;
     }
 }
 
