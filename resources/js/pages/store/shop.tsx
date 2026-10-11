@@ -65,6 +65,16 @@ export default function Shop({ products, categories, sizes, filters, priceRange 
         setSelectedSizesFilter(filters.size?.split(',').filter(Boolean) ?? []);
     }, [filters.q, filters.categories, filters.type, filters.in_stock, filters.min, filters.max, filters.size, priceRange.min, priceRange.max]);
 
+    useEffect(() => {
+        if (!notice) {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => setNotice(''), 3500);
+
+        return () => window.clearTimeout(timeout);
+    }, [notice]);
+
     const toggleSection = (section: keyof typeof openSections): void => {
         setOpenSections((current) => ({ ...current, [section]: !current[section] }));
     };
@@ -192,5 +202,5 @@ export default function Shop({ products, categories, sizes, filters, priceRange 
             }}
             onConfirm={() => { void addToCart(); }}
         />
-        {notice && <button onClick={() => setNotice('')} className="fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 bg-black px-5 py-3 text-sm text-white">{notice}</button>}</>;
+        {notice && <div role="status" aria-live="polite" className="fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 bg-black px-5 py-3 text-sm text-white">{notice}</div>}</>;
 }

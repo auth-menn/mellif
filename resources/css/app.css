@@ -17,6 +17,16 @@
     animation: shop-menu-arrow 1.1s ease-in-out infinite;
 }
 
+.home-carousel-frame {
+    aspect-ratio: var(--home-carousel-aspect-ratio, 1);
+}
+
+@media (max-width: 767px), (min-width: 768px) and (max-width: 1023px) and (orientation: portrait) {
+    .home-carousel-frame {
+        aspect-ratio: 9 / 16;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .shop-menu-arrow {
         animation: none;

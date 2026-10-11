@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import { index as shopIndex, show as shopShow } from '@/routes/shop';
 
@@ -222,8 +222,8 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                 >
                     <div
                         ref={carouselFrameRef}
-                        className="relative w-full cursor-grab overflow-hidden bg-black active:cursor-grabbing"
-                        style={{ aspectRatio: carouselAspectRatio }}
+                        className="home-carousel-frame relative w-full cursor-grab overflow-hidden bg-black active:cursor-grabbing"
+                        style={{ '--home-carousel-aspect-ratio': carouselAspectRatio } as CSSProperties}
                         onPointerDown={(event) => {
                             if (event.button !== 0) {
                                 return;
