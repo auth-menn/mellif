@@ -5,8 +5,6 @@ deployment:
     - export DEPLOYPATH=/home/eontforr/public_html
     - export PHP=/opt/cpanel/ea-php83/root/usr/bin/php
     - /bin/rsync -av --exclude='index.php' --exclude='.htaccess' --exclude='cgi-bin' --exclude='storage' $REPO/public/ $DEPLOYPATH/
-    - rm -rf $DEPLOYPATH/storage
-    - ln -sfn $REPO/storage/app/public $DEPLOYPATH/storage
     - cd $REPO && $PHP artisan config:cache
     - cd $REPO && $PHP artisan route:cache
     - cd $REPO && $PHP artisan view:cache
