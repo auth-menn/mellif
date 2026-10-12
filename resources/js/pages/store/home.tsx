@@ -10,14 +10,7 @@ type HomeSlide = {
     productUrl?: string | null;
 };
 
-const fallbackSlides: HomeSlide[] = [
-    { id: 1, imageUrl: '/images/home/look-01.webp', alt: '' },
-    { id: 2, imageUrl: '/images/home/look-02.webp', alt: '' },
-    { id: 3, imageUrl: '/images/home/look-03.webp', alt: '' },
-    { id: 4, imageUrl: '/images/home/look-04.webp', alt: '' },
-];
-
-export default function Home({ heroImageUrl, heroVideos, productSlides }: { heroImageUrl: string; heroVideos: string[]; productSlides: HomeSlide[] }) {
+export default function Home({ heroImageUrl, heroVideos, productSlides }: { heroImageUrl: string | null; heroVideos: string[]; productSlides: HomeSlide[] }) {
     const { t } = useTranslation();
     const heroFrameRef = useRef<HTMLDivElement>(null);
     const heroVideoRef = useRef<HTMLVideoElement>(null);
@@ -33,7 +26,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
     const [carouselAspectRatio, setCarouselAspectRatio] = useState(1);
     const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
     const [heroVisible, setHeroVisible] = useState(false);
-    const slides = productSlides.length > 0 ? productSlides : fallbackSlides;
+    const slides = productSlides;
     const activeHeroVideo = heroVideos[activeHeroVideoIndex] ?? heroVideos[0];
 
     const completeTransition = useCallback((): void => {
@@ -197,7 +190,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                     <div className="sticky top-12 mx-auto h-[calc(100svh-3rem)] w-full sm:top-14 sm:h-[calc(100svh-3.5rem)] md:top-16 md:h-[calc(100svh-4rem)] landscape:max-xl:top-12 landscape:max-xl:h-[calc(100svh-3rem)]">
                         <Link href={shopIndex.url()} aria-label={t('nav.shop')} className="absolute inset-0 z-10 cursor-pointer" />
                         <div ref={heroFrameRef} className="absolute inset-0 overflow-hidden bg-neutral-900 [will-change:clip-path,transform]">
-                            <video
+                            {activeHeroVideo && <video
                                 key={activeHeroVideo}
                                 ref={heroVideoRef}
                                 aria-hidden="true"
@@ -205,17 +198,17 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                                 loop={heroVideos.length === 1}
                                 playsInline
                                 preload="metadata"
-                                poster={heroImageUrl}
+                                poster={heroImageUrl ?? undefined}
                                 src={activeHeroVideo}
                                 onEnded={() => setActiveHeroVideoIndex((index) => (index + 1) % heroVideos.length)}
                                 className="h-full w-full object-cover"
-                            />
+                            />}
                             <div className="pointer-events-none absolute inset-0 bg-black/10" />
                         </div>
                     </div>
                 </section>
 
-                <section
+                {slides.length > 0 && <section
                     ref={carouselRef}
                     className="relative isolate w-full cursor-grab touch-pan-y select-none overflow-hidden bg-white active:cursor-grabbing"
                     aria-label={t('home.collection')}
@@ -340,7 +333,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                         })}
                         <div className="pointer-events-none absolute inset-0 bg-black/10" />
                     </div>
-                </section>
+                </section>}
             </main>
         </>
     );
