@@ -21,7 +21,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const isShop = url.split('?')[0] === '/shop';
     const isProduct = url.split('?')[0].startsWith('/shop/');
     const isCheckout = url.split('?')[0] === '/checkout';
-    const hasFloatingNavbar = isHome || isShop || isProduct || isCheckout;
     const user = (props.auth as { user?: { id: number; name: string; is_admin?: boolean } | null } | undefined)?.user;
     const [menuOpen, setMenuOpen] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
@@ -44,12 +43,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const { language, setLanguage, t } = useTranslation();
 
     useEffect(() => {
-        if (!hasFloatingNavbar) {
-            setFloatingNavbarScrolled(false);
-
-            return;
-        }
-
         let animationFrame = 0;
         const updateScrollState = (): void => {
             if (animationFrame !== 0) {
@@ -58,7 +51,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 
             animationFrame = window.requestAnimationFrame(() => {
                 animationFrame = 0;
-                setFloatingNavbarScrolled(window.scrollY > 12);
+                setFloatingNavbarScrolled((wasScrolled) => window.scrollY > (wasScrolled ? 8 : 24));
             });
         };
 
@@ -69,7 +62,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             window.removeEventListener('scroll', updateScrollState);
             window.cancelAnimationFrame(animationFrame);
         };
-    }, [hasFloatingNavbar]);
+    }, []);
 
     useEffect(() => {
         let active = true;
@@ -172,7 +165,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <div className="min-h-screen bg-white text-[#171815]">
-            <header className={`fixed z-40 transition-all duration-300 ease-out ${hasFloatingNavbar ? floatingNavbarScrolled ? 'left-1/2 right-auto top-2 h-11 w-[calc(100%-16px)] max-w-[1800px] -translate-x-1/2 rounded-2xl border border-white/15 bg-black text-white shadow-lg shadow-black/20 backdrop-blur-xl sm:top-3 sm:h-12 sm:w-[calc(100%-24px)] md:w-[calc(100%-32px)] md:h-14 landscape:max-xl:h-10' : 'inset-x-0 top-0 h-12 bg-black text-white sm:h-14 md:h-16 landscape:max-xl:h-12' : 'inset-x-0 top-0 h-12 bg-black text-white sm:h-14 md:h-16 landscape:max-xl:h-12'}`}>
+            <header className={`fixed left-1/2 z-40 w-full -translate-x-1/2 text-white will-change-[width,height,top] transition-[width,height,top,border-radius,border-color,box-shadow] duration-500 ease-out ${floatingNavbarScrolled ? 'top-2 h-11 w-[calc(100%-16px)] max-w-[1800px] rounded-2xl border border-white/15 bg-black shadow-lg shadow-black/20 sm:top-3 sm:h-12 sm:w-[calc(100%-24px)] md:w-[calc(100%-32px)] md:h-14 landscape:max-xl:h-10' : 'top-0 h-12 rounded-none border border-transparent bg-black shadow-none sm:h-14 md:h-16 landscape:max-xl:h-12'}`}>
                 <div className="mx-auto grid h-full max-w-[1800px] grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-1 px-2 sm:grid-cols-3 sm:gap-2 sm:px-4 md:px-7">
                     <button aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(true)} className="grid size-9 place-items-center"><Menu size={22} strokeWidth={1.5} /></button>
                     <Link href="/" aria-label="Mellif" className="justify-self-center">
@@ -183,7 +176,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                             muted
                             playsInline
                             aria-hidden="true"
-                            className={`object-contain transition-[width,height] duration-300 ${hasFloatingNavbar && floatingNavbarScrolled ? 'h-9 w-[4.5rem] sm:h-10 sm:w-20 md:h-12 md:w-24 landscape:max-xl:h-9 landscape:max-xl:w-[4.5rem]' : 'h-10 w-20 sm:h-12 sm:w-24 md:h-14 md:w-28 landscape:max-xl:h-10 landscape:max-xl:w-20'}`}
+                            className={`object-contain transition-[width,height] duration-500 ease-out ${floatingNavbarScrolled ? 'h-9 w-[4.5rem] sm:h-10 sm:w-20 md:h-12 md:w-24 landscape:max-xl:h-9 landscape:max-xl:w-[4.5rem]' : 'h-10 w-20 sm:h-12 sm:w-24 md:h-14 md:w-28 landscape:max-xl:h-10 landscape:max-xl:w-20'}`}
                         />
                     </Link>
                     <div className="flex shrink-0 items-center justify-self-end gap-0.5 sm:gap-2 md:gap-4">
