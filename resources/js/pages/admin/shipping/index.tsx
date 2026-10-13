@@ -12,15 +12,6 @@ type Courier = {
     is_active: boolean;
 };
 
-function courierCodePreview(name: string): string {
-    return name
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-}
-
 export default function ShippingIndex({
     couriers,
     editing,
@@ -34,6 +25,7 @@ export default function ShippingIndex({
     const [processing, setProcessing] = useState(false);
     const form = useForm({
         name: editing?.name ?? '',
+        code: editing?.code ?? '',
         is_active: editing?.is_active ?? true,
     });
 
@@ -171,9 +163,24 @@ export default function ShippingIndex({
                             }
                             className="mt-2 w-full border border-input bg-card p-3 text-foreground"
                         />
-                        <span className="mt-2 block text-xs text-muted-foreground">
-                            {t('admin.code')}: <code>{courierCodePreview(form.data.name) || '—'}</code>
-                        </span>
+                    </label>
+                    <label className="block text-sm">
+                        {t('admin.code')}
+                        <input
+                            value={form.data.code}
+                            onChange={(event) =>
+                                form.setData(
+                                    'code',
+                                    event.target.value.toLowerCase(),
+                                )
+                            }
+                            className="mt-2 w-full border border-input bg-card p-3 text-foreground"
+                        />
+                        {form.errors.code && (
+                            <span className="mt-1 block text-xs text-red-700">
+                                {form.errors.code}
+                            </span>
+                        )}
                     </label>
                     <label className="flex items-center gap-2 text-sm">
                         <input

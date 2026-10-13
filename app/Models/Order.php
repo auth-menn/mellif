@@ -13,7 +13,7 @@ class Order extends Model
     /** @use HasFactory<OrderFactory> */
     use HasFactory;
 
-    protected $fillable = ['user_id', 'order_number', 'recipient_name', 'phone', 'address', 'address_detail', 'shipping_courier', 'shipping_cost', 'payment_method', 'subtotal', 'total', 'status', 'notes'];
+    protected $fillable = ['user_id', 'order_number', 'recipient_name', 'phone', 'address', 'address_detail', 'shipping_courier', 'shipping_courier_code', 'shipping_service', 'shipping_etd', 'destination_id', 'destination_label', 'shipping_cost', 'payment_method', 'subtotal', 'total', 'status', 'notes'];
 
     public function user(): BelongsTo
     {

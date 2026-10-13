@@ -31,6 +31,7 @@ class SaveProductRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:10000'],
             'price' => ['required', 'integer', 'min:0'],
+            'weight' => ['required', 'integer', 'min:1', 'max:50000'],
             'discount_percent' => ['nullable', 'integer', 'between:1,99'],
             'is_featured' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],

@@ -13,11 +13,11 @@ class Product extends Model
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
 
-    protected $fillable = ['category_id', 'name', 'slug', 'description', 'price', 'discount_percent', 'is_featured', 'is_active'];
+    protected $fillable = ['category_id', 'name', 'slug', 'description', 'price', 'weight', 'discount_percent', 'is_featured', 'is_active'];
 
     protected function casts(): array
     {
-        return ['is_featured' => 'boolean', 'is_active' => 'boolean'];
+        return ['weight' => 'integer', 'is_featured' => 'boolean', 'is_active' => 'boolean'];
     }
 
     public function category(): BelongsTo

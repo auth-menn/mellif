@@ -24,6 +24,7 @@ it('creates a product with ordered uploaded images and variants', function () {
         'name' => 'Studio Tee',
         'description' => 'Cotton tee',
         'price' => 199000,
+        'weight' => 620,
         'discount_percent' => 15,
         'is_active' => 1,
         'is_featured' => 1,

@@ -6,6 +6,7 @@ export type Product = {
     slug: string;
     description: string;
     price: number;
+    weight: number;
     discount_percent: number | null;
     discounted_price: number;
     is_featured: boolean;
@@ -15,7 +16,11 @@ export type Product = {
     stock: number;
 };
 
-export type CartLine = { product: Product; variant: StoreVariant; quantity: number };
+export type CartLine = {
+    product: Product;
+    variant: StoreVariant;
+    quantity: number;
+};
 
 export const money = (amount: number): string =>
     new Intl.NumberFormat('id-ID', {

@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShippingCourier;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 
 function makeStockConsistencyProduct(
     string $slug = 'stock-consistency-product',
@@ -63,7 +64,10 @@ function stockConsistencyCheckoutPayload(array $context, array $items): array
         'recipient_name' => 'Test Buyer',
         'phone' => '08123456789',
         'address' => 'Jakarta',
-        'shipping_courier_id' => $context['courier']->id,
+        'destination_id' => 1376,
+        'destination_label' => 'Jakarta Selatan',
+        'courier_code' => 'stock-test-courier',
+        'courier_service' => 'REG',
         'payment_method_id' => $context['payment']->id,
         'items' => $items,
     ];
@@ -87,6 +91,12 @@ function makeStockConsistencyOrder(User $buyer): Order
 }
 
 describe('checkout stock consistency', function () {
+    beforeEach(function (): void {
+        config(['services.rajaongkir.key' => 'test-key', 'services.rajaongkir.origin_id' => 1391]);
+        Http::fake(['*calculate/domestic-cost' => Http::response(['meta' => ['status' => 'success', 'code' => 200], 'data' => [[
+            'name' => 'Test Courier', 'code' => 'stock-test-courier', 'service' => 'REG', 'description' => 'Regular', 'cost' => 18000, 'etd' => '2-3',
+        ]]])]);
+    });
     it('returns 422 and preserves stock when duplicate variant quantities exceed stock', function () {
         $context = makeStockConsistencyCheckoutContext();
         $product = makeStockConsistencyProduct();

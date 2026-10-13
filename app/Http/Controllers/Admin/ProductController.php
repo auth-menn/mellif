@@ -142,6 +142,7 @@ class ProductController extends Controller
         return [
             'category_id' => $data['category_id'], 'name' => $data['name'], 'slug' => $slug,
             'description' => $data['description'], 'price' => $data['price'],
+            'weight' => $data['weight'],
             'discount_percent' => $data['discount_percent'] ?? null,
             'is_featured' => $data['is_featured'] ?? false, 'is_active' => $data['is_active'] ?? false,
         ];

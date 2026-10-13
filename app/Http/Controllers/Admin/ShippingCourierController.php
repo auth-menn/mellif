@@ -7,7 +7,6 @@ use App\Http\Requests\Admin\SaveShippingCourierRequest;
 use App\Models\ShippingCourier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,7 +37,6 @@ class ShippingCourierController extends Controller
     public function store(SaveShippingCourierRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        $data['code'] = $this->uniqueCode($data['name']);
         $data['flat_cost'] = 0;
 
         ShippingCourier::query()->create($data);
@@ -70,7 +68,6 @@ class ShippingCourierController extends Controller
     public function update(SaveShippingCourierRequest $request, ShippingCourier $shipping): RedirectResponse
     {
         $data = $request->validated();
-        $data['code'] = $this->uniqueCode($data['name'], $shipping);
         $shipping->update($data);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.courierUpdated']);
@@ -88,23 +85,5 @@ class ShippingCourierController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.courierDeleted']);
 
         return redirect()->route('admin.shipping.index');
-    }
-
-    private function uniqueCode(string $name, ?ShippingCourier $shipping = null): string
-    {
-        $baseCode = Str::slug($name) ?: 'courier';
-        $code = mb_substr($baseCode, 0, 40);
-        $suffix = 2;
-
-        while (ShippingCourier::query()->where('code', $code)->when(
-            $shipping,
-            fn ($query) => $query->where('id', '!=', $shipping->id),
-        )->exists()) {
-            $ending = '-'.$suffix;
-            $code = mb_substr($baseCode, 0, 40 - mb_strlen($ending)).$ending;
-            $suffix++;
-        }
-
-        return $code;
     }
 }

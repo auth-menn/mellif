@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SaveShippingCourierRequest extends FormRequest
 {
@@ -23,6 +24,7 @@ class SaveShippingCourierRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:120'],
+            'code' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('shipping_couriers', 'code')->ignore($this->route('shipping')?->id)],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

@@ -164,7 +164,7 @@ class StorefrontController extends Controller
     {
         return [
             'id' => $product->id, 'name' => $product->name, 'slug' => $product->slug,
-            'description' => $product->description, 'price' => $product->price,
+            'description' => $product->description, 'price' => $product->price, 'weight' => $product->weight,
             'discount_percent' => $product->discount_percent, 'discounted_price' => $product->discounted_price,
             'is_featured' => $product->is_featured, 'category' => $product->category?->name,
             'images' => $product->images->map(fn ($image) => asset('storage/'.$image->path))->all(),

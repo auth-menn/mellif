@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\GoogleController;
+use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\StorefrontController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,8 @@ Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
 Route::get('/shop/{product:slug}', [StorefrontController::class, 'product'])->name('shop.show');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('auth')->name('checkout.store');
+Route::get('/shipping/destinations', [ShippingController::class, 'destinations'])->middleware('throttle:30,1')->name('shipping.destinations');
+Route::post('/shipping/rates', [ShippingController::class, 'rates'])->middleware('throttle:20,1')->name('shipping.rates');
 Route::get('/akun/reset-password/{token}', [PasswordResetController::class, 'show'])->name('password.reset.custom');
 Route::post('/akun/reset-password', [PasswordResetController::class, 'update'])
     ->middleware('throttle:6,1')
