@@ -41,7 +41,7 @@ class OrderController extends Controller
                 abort(422, 'Status pesanan yang sudah ditutup tidak dapat diubah.');
             }
 
-            if (in_array($newStatus, $terminalStatuses, true)) {
+            if (in_array($newStatus, $terminalStatuses, true) && $lockedOrder->stock_deducted) {
                 $lockedOrder->load('items');
                 $quantitiesByVariant = $lockedOrder->items
                     ->whereNotNull('variant_id')
@@ -57,6 +57,8 @@ class OrderController extends Controller
                 foreach ($quantitiesByVariant as $variantId => $quantity) {
                     $variants->get((int) $variantId)?->increment('stock', $quantity);
                 }
+
+                $lockedOrder->stock_deducted = false;
             }
 
             $lockedOrder->update([

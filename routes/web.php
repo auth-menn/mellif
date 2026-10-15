@@ -19,9 +19,14 @@ Route::get('/about', [StorefrontController::class, 'about'])->name('about');
 Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
 Route::get('/shop/{product:slug}', [StorefrontController::class, 'product'])->name('shop.show');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
-Route::post('/checkout', [CheckoutController::class, 'store'])->middleware('auth')->name('checkout.store');
-Route::get('/shipping/destinations', [ShippingController::class, 'destinations'])->middleware('throttle:30,1')->name('shipping.destinations');
-Route::post('/shipping/rates', [ShippingController::class, 'rates'])->middleware('throttle:20,1')->name('shipping.rates');
+Route::post('/checkout', [CheckoutController::class, 'store'])->middleware(['auth', 'throttle:checkout'])->name('checkout.store');
+Route::middleware(['auth', 'throttle:10,1'])->prefix('checkout/orders/{order}')->name('checkout.orders.')->group(function () {
+    Route::get('/qris-status', [CheckoutController::class, 'paymentStatus'])->name('qris-status');
+    Route::post('/qris', [CheckoutController::class, 'regenerateQris'])->name('qris.regenerate');
+    Route::post('/cancel-payment', [CheckoutController::class, 'cancelQrisPayment'])->name('qris.cancel');
+});
+Route::get('/shipping/destinations', [ShippingController::class, 'destinations'])->middleware('throttle:shipping-destinations')->name('shipping.destinations');
+Route::post('/shipping/rates', [ShippingController::class, 'rates'])->middleware('throttle:shipping-rates')->name('shipping.rates');
 Route::get('/akun/reset-password/{token}', [PasswordResetController::class, 'show'])->name('password.reset.custom');
 Route::post('/akun/reset-password', [PasswordResetController::class, 'update'])
     ->middleware('throttle:6,1')
@@ -38,7 +43,7 @@ Route::middleware('guest')->prefix('auth/google')->name('google.')->group(functi
     Route::get('/callback', [GoogleController::class, 'callback'])->name('callback');
 });
 
-Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::patch('products/{product}/status', [ProductController::class, 'updateStatus'])->name('products.status');
     Route::resource('products', ProductController::class);

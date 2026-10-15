@@ -20,6 +20,7 @@ class ShippingCourierController extends Controller
         return Inertia::render('admin/shipping/index', [
             'couriers' => ShippingCourier::query()->orderBy('name')->paginate(20)->withQueryString(),
             'editing' => $request->integer('edit') ? ShippingCourier::query()->find($request->integer('edit')) : null,
+            'courierCodes' => config('shipping.courier_codes', []),
         ]);
     }
 
@@ -40,6 +41,7 @@ class ShippingCourierController extends Controller
         $data['flat_cost'] = 0;
 
         ShippingCourier::query()->create($data);
+        ShippingCourier::clearActiveCodesCache();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.courierCreated']);
 
@@ -69,6 +71,7 @@ class ShippingCourierController extends Controller
     {
         $data = $request->validated();
         $shipping->update($data);
+        ShippingCourier::clearActiveCodesCache();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.courierUpdated']);
 
@@ -81,6 +84,7 @@ class ShippingCourierController extends Controller
     public function destroy(ShippingCourier $shipping): RedirectResponse
     {
         $shipping->delete();
+        ShippingCourier::clearActiveCodesCache();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.courierDeleted']);
 

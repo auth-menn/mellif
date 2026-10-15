@@ -28,6 +28,13 @@ return [
         'key' => env('RAJAONGKIR_KEY'),
         'base_url' => env('RAJAONGKIR_BASE_URL', 'https://rajaongkir.komerce.id/api/v1'),
         'origin_id' => env('RAJAONGKIR_ORIGIN_ID'),
+        'daily_limit' => env('RAJAONGKIR_DAILY_LIMIT', 90),
+    ],
+
+    'qrisly' => [
+        'key' => env('QRISLY_KEY'),
+        'qris_id' => env('QRISLY_QRIS_ID'),
+        'base_url' => env('QRISLY_BASE_URL', 'https://api-sandbox.collaborator.komerce.id/user'),
     ],
 
     'mellif' => [

@@ -24,7 +24,7 @@ class SaveShippingCourierRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:120'],
-            'code' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('shipping_couriers', 'code')->ignore($this->route('shipping')?->id)],
+            'code' => ['required', 'string', 'max:40', Rule::in(config('shipping.courier_codes', [])), Rule::unique('shipping_couriers', 'code')->ignore($this->route('shipping')?->id)],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

@@ -47,7 +47,7 @@ function makeStockConsistencyCheckoutContext(): array
     return [
         'user' => User::factory()->create(),
         'courier' => ShippingCourier::query()->create([
-            'name' => 'Test Courier', 'code' => 'stock-test-courier', 'flat_cost' => 18000, 'is_active' => true,
+            'name' => 'JNE', 'code' => 'jne', 'flat_cost' => 18000, 'is_active' => true,
         ]),
         'payment' => PaymentMethod::query()->create([
             'name' => 'Test Payment', 'code' => 'stock-test-payment', 'is_active' => true,
@@ -66,8 +66,9 @@ function stockConsistencyCheckoutPayload(array $context, array $items): array
         'address' => 'Jakarta',
         'destination_id' => 1376,
         'destination_label' => 'Jakarta Selatan',
-        'courier_code' => 'stock-test-courier',
+        'courier_code' => 'jne',
         'courier_service' => 'REG',
+        'expected_shipping_cost' => 18000,
         'payment_method_id' => $context['payment']->id,
         'items' => $items,
     ];
@@ -94,7 +95,7 @@ describe('checkout stock consistency', function () {
     beforeEach(function (): void {
         config(['services.rajaongkir.key' => 'test-key', 'services.rajaongkir.origin_id' => 1391]);
         Http::fake(['*calculate/domestic-cost' => Http::response(['meta' => ['status' => 'success', 'code' => 200], 'data' => [[
-            'name' => 'Test Courier', 'code' => 'stock-test-courier', 'service' => 'REG', 'description' => 'Regular', 'cost' => 18000, 'etd' => '2-3',
+            'name' => 'JNE', 'code' => 'jne', 'service' => 'REG', 'description' => 'Regular', 'cost' => 18000, 'etd' => '2-3',
         ]]])]);
     });
     it('returns 422 and preserves stock when duplicate variant quantities exceed stock', function () {
@@ -107,7 +108,7 @@ describe('checkout stock consistency', function () {
                 ['variant_id' => $variant->id, 'qty' => 3],
                 ['variant_id' => $variant->id, 'qty' => 3],
             ]))
-            ->assertStatus(422);
+            ->assertSessionHasErrors('items');
 
         $this->assertDatabaseCount('orders', 0);
         expect($variant->fresh()->stock)->toBe(5);
@@ -123,7 +124,7 @@ describe('checkout stock consistency', function () {
                 ['variant_id' => $variant->id, 'qty' => 3],
                 ['variant_id' => $variant->id, 'qty' => 2],
             ]))
-            ->assertRedirect(route('checkout.show'));
+            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
 
         expect($variant->fresh()->stock)->toBe(0)
             ->and($variant->fresh()->stock)->toBeGreaterThanOrEqual(0);
@@ -138,7 +139,7 @@ describe('checkout stock consistency', function () {
             ->post('/checkout', stockConsistencyCheckoutPayload($context, [
                 ['variant_id' => 999999, 'qty' => 1],
             ]))
-            ->assertStatus(422);
+            ->assertSessionHasErrors('items');
 
         $this->assertDatabaseCount('orders', 0);
     });
@@ -152,7 +153,7 @@ describe('checkout stock consistency', function () {
             ->post('/checkout', stockConsistencyCheckoutPayload($context, [
                 ['variant_id' => $variant->id, 'qty' => 1],
             ]))
-            ->assertStatus(422);
+            ->assertSessionHasErrors('items');
 
         $this->assertDatabaseCount('orders', 0);
         expect($variant->fresh()->stock)->toBe(4);
@@ -178,7 +179,7 @@ describe('checkout stock consistency', function () {
             ->post('/checkout', stockConsistencyCheckoutPayload($context, [
                 ['variant_id' => $purchasedVariant->id, 'qty' => 1],
             ]))
-            ->assertRedirect(route('checkout.show'));
+            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
 
         $this->assertDatabaseMissing('cart_items', ['id' => $purchasedCartItem->id]);
         $this->assertDatabaseHas('cart_items', ['id' => $otherVariantCartItem->id, 'quantity' => 2]);

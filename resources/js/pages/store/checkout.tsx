@@ -1,8 +1,11 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import type { CartLine } from '@/types/store';
 import { money } from '@/types/store';
 import { store as placeOrder } from '@/routes/checkout';
+import { qrisStatus } from '@/routes/checkout/orders';
+import { cancel, regenerate } from '@/routes/checkout/orders/qris';
 import {
     destinations as destinationRoute,
     rates as ratesRoute,
@@ -35,7 +38,30 @@ type Rate = {
     cost: number;
     etd: string | null;
 };
-type PaymentMethod = { id: number; name: string };
+type PaymentMethod = { id: number; name: string; code: string };
+type QrisPaymentStatus = 'unpaid' | 'paid' | 'expired' | 'cancelled' | 'failed';
+
+function qrisPaymentStatus(
+    status: string | null | undefined,
+): QrisPaymentStatus | null {
+    return status &&
+        ['unpaid', 'paid', 'expired', 'cancelled', 'failed'].includes(status)
+        ? (status as QrisPaymentStatus)
+        : null;
+}
+
+type CheckoutOrder = {
+    id: number;
+    orderNumber: string;
+    status: string;
+    total: number;
+    paymentMethodCode: string | null;
+    qrisString: string | null;
+    qrisImage: string | null;
+    qrisFinalAmount: number | null;
+    qrisPaymentStatus: string | null;
+    qrisExpiryTime: string | null;
+};
 
 function xsrfToken(): string {
     const token = document.cookie
@@ -49,10 +75,10 @@ function xsrfToken(): string {
 
 export default function Checkout({
     paymentMethods,
-    orderNumber,
+    order,
 }: {
     paymentMethods: PaymentMethod[];
-    orderNumber: string | null;
+    order: CheckoutOrder | null;
 }) {
     const { props } = usePage();
     const { t } = useTranslation();
@@ -85,6 +111,17 @@ export default function Checkout({
     const [cartRemovalProcessing, setCartRemovalProcessing] = useState(false);
     const [orderConfirmOpen, setOrderConfirmOpen] = useState(false);
     const [orderSubmitting, setOrderSubmitting] = useState(false);
+    const [keepCheckoutVisible, setKeepCheckoutVisible] = useState(false);
+    const [paymentStatus, setPaymentStatus] =
+        useState<QrisPaymentStatus | null>(
+            qrisPaymentStatus(order?.qrisPaymentStatus),
+        );
+    const [qrisSecondsRemaining, setQrisSecondsRemaining] = useState<
+        number | null
+    >(null);
+    const [qrisCopied, setQrisCopied] = useState(false);
+    const [cancelSubmitting, setCancelSubmitting] = useState(false);
+    const [qrisRegenerating, setQrisRegenerating] = useState(false);
     const [destinationQuery, setDestinationQuery] = useState('');
     const [destination, setDestination] = useState<Destination | null>(null);
     const [destinationOptions, setDestinationOptions] = useState<Destination[]>(
@@ -96,6 +133,82 @@ export default function Checkout({
     const [ratesLoading, setRatesLoading] = useState(false);
     const [ratesError, setRatesError] = useState('');
     const [selectedRateKey, setSelectedRateKey] = useState('');
+
+    useEffect(() => {
+        setPaymentStatus(qrisPaymentStatus(order?.qrisPaymentStatus));
+        setQrisCopied(false);
+    }, [order?.id, order?.qrisPaymentStatus]);
+
+    useEffect(() => {
+        if (paymentStatus === 'paid') {
+            setKeepCheckoutVisible(false);
+        }
+    }, [paymentStatus]);
+
+    useEffect(() => {
+        if (!order?.qrisExpiryTime || paymentStatus !== 'unpaid') {
+            setQrisSecondsRemaining(null);
+            return;
+        }
+
+        const expiryTimestamp = new Date(order.qrisExpiryTime).getTime();
+        if (!Number.isFinite(expiryTimestamp)) {
+            setQrisSecondsRemaining(null);
+            return;
+        }
+
+        const updateCountdown = (): void => {
+            setQrisSecondsRemaining(
+                Math.max(0, Math.ceil((expiryTimestamp - Date.now()) / 1000)),
+            );
+        };
+
+        updateCountdown();
+        const interval = window.setInterval(updateCountdown, 1000);
+        return () => window.clearInterval(interval);
+    }, [order?.id, order?.qrisExpiryTime, paymentStatus]);
+
+    useEffect(() => {
+        if (!order?.id || !order.qrisString || paymentStatus !== 'unpaid')
+            return;
+
+        let active = true;
+        const refreshPaymentStatus = async (): Promise<void> => {
+            try {
+                const response = await fetch(qrisStatus.url(order.id), {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return;
+                const result = (await response.json()) as {
+                    payment_status?: string;
+                };
+                if (
+                    active &&
+                    result.payment_status &&
+                    ['unpaid', 'paid', 'expired', 'cancelled'].includes(
+                        result.payment_status,
+                    )
+                ) {
+                    setPaymentStatus(
+                        result.payment_status as QrisPaymentStatus,
+                    );
+                }
+            } catch {
+                // Keep the last known payment status when the network is unavailable.
+            }
+        };
+
+        void refreshPaymentStatus();
+        const interval = window.setInterval(
+            () => void refreshPaymentStatus(),
+            10000,
+        );
+        return () => {
+            active = false;
+            window.clearInterval(interval);
+        };
+    }, [order?.id, order?.qrisString, paymentStatus]);
 
     useEffect(() => {
         if (!user) return;
@@ -132,7 +245,7 @@ export default function Checkout({
 
     useEffect(() => {
         const query = destinationQuery.trim();
-        if (query.length < 3 || destination?.label === query) {
+        if (query.length < 4 || destination?.label === query) {
             setDestinationOptions([]);
             setDestinationLoading(false);
             return;
@@ -168,7 +281,7 @@ export default function Checkout({
             } finally {
                 if (!controller.signal.aborted) setDestinationLoading(false);
             }
-        }, 400);
+        }, 700);
         return () => {
             window.clearTimeout(timeout);
             controller.abort();
@@ -246,6 +359,9 @@ export default function Checkout({
         rates.find(
             (rate) => `${rate.code}:${rate.service}` === selectedRateKey,
         ) ?? null;
+    const selectedPaymentMethod = paymentMethods.find(
+        (method) => method.id === paymentId,
+    );
     const shipping = selectedRate?.cost ?? 0;
 
     const confirmCartRemoval = async (): Promise<void> => {
@@ -285,6 +401,7 @@ export default function Checkout({
                 destination_label: destination.label,
                 courier_code: selectedRate.code,
                 courier_service: selectedRate.service,
+                expected_shipping_cost: selectedRate.cost,
                 payment_method_id: paymentId,
                 items: cart.map((line) => ({
                     variant_id: line.variant.id,
@@ -292,13 +409,19 @@ export default function Checkout({
                 })),
             },
             {
+                preserveState: true,
+                preserveScroll: true,
                 onStart: () => setOrderSubmitting(true),
                 onError: (responseErrors) =>
                     setErrors(responseErrors as Record<string, string>),
                 onSuccess: () => {
-                    localStorage.removeItem('mellif-cart');
-                    setCart([]);
-                    window.dispatchEvent(new Event('mellif-cart-updated'));
+                    if (selectedPaymentMethod?.code === 'qris') {
+                        setKeepCheckoutVisible(true);
+                    } else {
+                        localStorage.removeItem('mellif-cart');
+                        setCart([]);
+                        window.dispatchEvent(new Event('mellif-cart-updated'));
+                    }
                 },
                 onFinish: () => setOrderSubmitting(false),
             },
@@ -318,33 +441,282 @@ export default function Checkout({
         submit();
     };
 
-    if (orderNumber)
+    const isQrisExpired =
+        paymentStatus === 'expired' ||
+        (paymentStatus === 'unpaid' && qrisSecondsRemaining === 0);
+    const canGenerateQris =
+        isQrisExpired || ['failed', 'cancelled'].includes(paymentStatus ?? '');
+
+    if (order && !keepCheckoutVisible) {
+        const isQrisOrder = order.paymentMethodCode === 'qris';
+        const isOrderCancelled =
+            isQrisOrder && ['cancelled', 'rejected'].includes(order.status);
+        const isPaymentComplete =
+            !isQrisOrder || (paymentStatus === 'paid' && !isOrderCancelled);
+
         return (
             <>
-                <Head title={`${t('checkout.accepted')} · Mellif Studio`} />
-                <main className="mx-auto min-h-screen max-w-3xl px-6 pt-40 pb-20 text-center">
-                    <p className="text-xs tracking-[.25em] text-neutral-500 uppercase">
-                        {t('checkout.accepted')}
-                    </p>
-                    <h1 className="mt-5 text-4xl font-medium">
-                        {t('checkout.thanks')}
-                    </h1>
-                    <p className="mt-5 text-neutral-600">
-                        {t('checkout.orderNumber')}
-                    </p>
-                    <p className="mt-2 text-xl font-semibold">{orderNumber}</p>
-                    <p className="mx-auto mt-8 max-w-xl text-sm leading-6 text-neutral-500">
-                        {t('checkout.paymentLater')}
-                    </p>
-                    <Link
-                        href={shopIndex.url()}
-                        className="mt-8 inline-block bg-black px-8 py-4 text-sm text-white"
-                    >
-                        {t('checkout.continueShopping')}
-                    </Link>
-                </main>
+                <Head
+                    title={`${isPaymentComplete ? t('checkout.accepted') : t('checkout.qrisPayment')} · Mellif Studio`}
+                />
+                {isPaymentComplete ? (
+                    <main className="mx-auto min-h-screen max-w-3xl px-6 pt-40 pb-20 text-center">
+                        <p className="text-xs tracking-[.25em] text-neutral-500 uppercase">
+                            {t('checkout.accepted')}
+                        </p>
+                        <h1 className="mt-5 text-4xl font-medium">
+                            {t('checkout.thanks')}
+                        </h1>
+                        <p className="mt-5 text-neutral-600">
+                            {t('checkout.orderNumber')}
+                        </p>
+                        <p className="mt-2 text-xl font-semibold">
+                            {order.orderNumber}
+                        </p>
+                        {isQrisOrder && (
+                            <div className="mx-auto mt-8 max-w-xl rounded border border-green-200 bg-green-50 p-6 text-left">
+                                <p className="font-semibold text-green-800">
+                                    {t('checkout.qrisStatus.paid')}
+                                </p>
+                                <p className="mt-2 text-sm text-green-800">
+                                    {t('checkout.packing')}
+                                </p>
+                            </div>
+                        )}
+                        <Link
+                            href={shopIndex.url()}
+                            className="mt-8 inline-block bg-black px-8 py-4 text-sm text-white"
+                        >
+                            {t('checkout.continueShopping')}
+                        </Link>
+                    </main>
+                ) : isOrderCancelled ? (
+                    <main className="mx-auto min-h-screen max-w-3xl px-6 pt-40 pb-20 text-center">
+                        <p className="text-xs tracking-[.25em] text-neutral-500 uppercase">
+                            {t('checkout.qrisStatus.cancelled')}
+                        </p>
+                        <h1 className="mt-5 text-3xl font-medium">
+                            {t('checkout.orderCancelled')}
+                        </h1>
+                        <p className="mt-4 text-neutral-600">
+                            {order.orderNumber}
+                        </p>
+                        <Link
+                            href={shopIndex.url()}
+                            className="mt-8 inline-block bg-black px-8 py-4 text-sm text-white"
+                        >
+                            {t('checkout.continueShopping')}
+                        </Link>
+                    </main>
+                ) : (
+                    <>
+                        <main className="mx-auto min-h-screen max-w-6xl px-5 pt-28 pb-20">
+                            <h1 className="text-center text-3xl font-medium">
+                                {t('checkout.title')}
+                            </h1>
+                            <section className="mx-auto mt-8 max-w-xl border border-neutral-200 p-6 text-center">
+                                <p className="text-sm text-neutral-600">
+                                    {t('checkout.qrisStatus.unpaid')}
+                                </p>
+                                <p className="mt-2 text-lg font-semibold">
+                                    {order.orderNumber}
+                                </p>
+                                <p className="mt-3 text-sm text-neutral-600">
+                                    {t('checkout.paymentStatusAuto')}
+                                </p>
+                            </section>
+                        </main>
+                        <Dialog open>
+                            <DialogContent
+                                className="z-[90] max-h-[90svh] overflow-y-auto bg-white text-neutral-900 sm:max-w-md"
+                                overlayClassName="z-[80]"
+                            >
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        {t('checkout.qrisPayment')}
+                                    </DialogTitle>
+                                    <DialogDescription className="text-neutral-600">
+                                        {order.orderNumber} ·{' '}
+                                        {paymentStatus === 'unpaid' &&
+                                        !isQrisExpired
+                                            ? t('checkout.qrisStatus.unpaid')
+                                            : isQrisExpired
+                                              ? t('checkout.qrisStatus.expired')
+                                              : paymentStatus === 'cancelled'
+                                                ? t(
+                                                      'checkout.qrisStatus.cancelled',
+                                                  )
+                                                : t(
+                                                      'checkout.qrisStatus.failed',
+                                                  )}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="text-center">
+                                    <p className="text-sm text-neutral-600">
+                                        {t('checkout.amountToPay')}
+                                    </p>
+                                    <p className="mt-1 text-3xl font-semibold">
+                                        {money(
+                                            order.qrisFinalAmount ??
+                                                order.total,
+                                        )}
+                                    </p>
+                                    {order.qrisExpiryTime &&
+                                        paymentStatus === 'unpaid' &&
+                                        !isQrisExpired && (
+                                            <p className="mt-2 text-xs text-neutral-500">
+                                                {t('checkout.qrisExpires')}:{' '}
+                                                {new Date(
+                                                    order.qrisExpiryTime,
+                                                ).toLocaleString()}
+                                            </p>
+                                        )}
+                                </div>
+                                {order.qrisString &&
+                                paymentStatus === 'unpaid' &&
+                                !isQrisExpired ? (
+                                    <div className="flex flex-col items-center gap-4">
+                                        {order.qrisImage && (
+                                            <img
+                                                src={order.qrisImage}
+                                                alt={t('checkout.qrisPayment')}
+                                                className="size-64 max-w-full rounded border border-neutral-200 bg-white p-2"
+                                            />
+                                        )}
+                                        {qrisSecondsRemaining !== null && (
+                                            <p
+                                                aria-live="polite"
+                                                className="text-sm font-medium text-neutral-700 tabular-nums"
+                                            >
+                                                {t(
+                                                    'checkout.qrisTimeRemaining',
+                                                )}
+                                                :{' '}
+                                                {String(
+                                                    Math.floor(
+                                                        qrisSecondsRemaining /
+                                                            60,
+                                                    ),
+                                                ).padStart(2, '0')}
+                                                :
+                                                {String(
+                                                    qrisSecondsRemaining % 60,
+                                                ).padStart(2, '0')}
+                                            </p>
+                                        )}
+                                        <p className="text-center text-sm text-neutral-600">
+                                            {t('checkout.qrisInstructions')}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void navigator.clipboard
+                                                    .writeText(
+                                                        order.qrisString ?? '',
+                                                    )
+                                                    .then(() =>
+                                                        setQrisCopied(true),
+                                                    )
+                                                    .catch(() =>
+                                                        setQrisCopied(false),
+                                                    )
+                                            }
+                                            className="inline-flex items-center gap-2 border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+                                        >
+                                            {qrisCopied ? (
+                                                <Check className="size-4" />
+                                            ) : (
+                                                <Copy className="size-4" />
+                                            )}
+                                            {qrisCopied
+                                                ? t('checkout.qrisCopied')
+                                                : t('checkout.copyQris')}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-center">
+                                        <p className="text-sm text-red-700">
+                                            {isQrisExpired
+                                                ? t(
+                                                      'checkout.qrisExpiredMessage',
+                                                  )
+                                                : t(
+                                                      'checkout.qrisGenerateFailed',
+                                                  )}
+                                        </p>
+                                        {canGenerateQris && (
+                                            <button
+                                                type="button"
+                                                disabled={qrisRegenerating}
+                                                onClick={() =>
+                                                    router.post(
+                                                        regenerate.url(
+                                                            order.id,
+                                                        ),
+                                                        {},
+                                                        {
+                                                            onStart: () =>
+                                                                setQrisRegenerating(
+                                                                    true,
+                                                                ),
+                                                            onFinish: () =>
+                                                                setQrisRegenerating(
+                                                                    false,
+                                                                ),
+                                                        },
+                                                    )
+                                                }
+                                                className="mt-3 bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                                            >
+                                                {qrisRegenerating
+                                                    ? t('checkout.processing')
+                                                    : t(
+                                                          'checkout.qrisTryAgain',
+                                                      )}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                <p className="text-center text-xs text-neutral-500">
+                                    {t('checkout.paymentStatusAuto')}
+                                </p>
+                                <p className="text-center text-xs text-amber-700">
+                                    {t('checkout.qrisCancelNote')}
+                                </p>
+                                <DialogFooter className="border-t border-neutral-200 pt-4">
+                                    <button
+                                        type="button"
+                                        disabled={cancelSubmitting}
+                                        onClick={() =>
+                                            router.post(
+                                                cancel.url(order.id),
+                                                {},
+                                                {
+                                                    onStart: () =>
+                                                        setCancelSubmitting(
+                                                            true,
+                                                        ),
+                                                    onFinish: () =>
+                                                        setCancelSubmitting(
+                                                            false,
+                                                        ),
+                                                },
+                                            )
+                                        }
+                                        className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                                    >
+                                        {cancelSubmitting
+                                            ? t('checkout.processing')
+                                            : t('checkout.cancelPayment')}
+                                    </button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </>
+                )}
             </>
         );
+    }
 
     return (
         <>
@@ -415,7 +787,13 @@ export default function Checkout({
                         ))}
                         <div className="relative">
                             <label className="block text-sm">
-                                {t('checkout.destination')}
+                                {t('checkout.destination')}{' '}
+                                <span
+                                    aria-hidden="true"
+                                    className="text-red-700"
+                                >
+                                    *
+                                </span>
                                 <input
                                     value={destinationQuery}
                                     onChange={(event) => {
@@ -474,6 +852,11 @@ export default function Checkout({
                             {errors.destination_id && (
                                 <p className="mt-1 text-xs text-red-700">
                                     {errors.destination_id}
+                                </p>
+                            )}
+                            {!destination && !errors.destination_id && (
+                                <p className="mt-1 text-xs text-neutral-600">
+                                    {t('checkout.destinationRequired')}
                                 </p>
                             )}
                         </div>
@@ -683,6 +1066,168 @@ export default function Checkout({
                     </aside>
                 </div>
             </main>
+            {order && keepCheckoutVisible && (
+                <Dialog open>
+                    <DialogContent
+                        className="z-[90] max-h-[90svh] overflow-y-auto bg-white text-neutral-900 sm:max-w-md"
+                        overlayClassName="z-[80]"
+                    >
+                        <DialogHeader>
+                            <DialogTitle>
+                                {t('checkout.qrisPayment')}
+                            </DialogTitle>
+                            <DialogDescription className="text-neutral-600">
+                                {order.orderNumber} Â·{' '}
+                                {isQrisExpired
+                                    ? t('checkout.qrisStatus.expired')
+                                    : paymentStatus === 'unpaid'
+                                      ? t('checkout.qrisStatus.unpaid')
+                                      : t('checkout.qrisStatus.failed')}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="text-center">
+                            <p className="text-sm text-neutral-600">
+                                {t('checkout.amountToPay')}
+                            </p>
+                            <p className="mt-1 text-3xl font-semibold">
+                                {money(order.qrisFinalAmount ?? order.total)}
+                            </p>
+                            {order.qrisExpiryTime &&
+                                paymentStatus === 'unpaid' &&
+                                !isQrisExpired && (
+                                    <p className="mt-2 text-xs text-neutral-500">
+                                        {t('checkout.qrisExpires')}:{' '}
+                                        {new Date(
+                                            order.qrisExpiryTime,
+                                        ).toLocaleString()}
+                                    </p>
+                                )}
+                        </div>
+                        {order.qrisString &&
+                        paymentStatus === 'unpaid' &&
+                        !isQrisExpired ? (
+                            <div className="flex flex-col items-center gap-4">
+                                {order.qrisImage && (
+                                    <img
+                                        src={order.qrisImage}
+                                        alt={t('checkout.qrisPayment')}
+                                        className="size-64 max-w-full rounded border border-neutral-200 bg-white p-2"
+                                    />
+                                )}
+                                {qrisSecondsRemaining !== null && (
+                                    <p
+                                        aria-live="polite"
+                                        className="text-sm font-medium text-neutral-700 tabular-nums"
+                                    >
+                                        {t('checkout.qrisTimeRemaining')}:{' '}
+                                        {String(
+                                            Math.floor(
+                                                qrisSecondsRemaining / 60,
+                                            ),
+                                        ).padStart(2, '0')}
+                                        :
+                                        {String(
+                                            qrisSecondsRemaining % 60,
+                                        ).padStart(2, '0')}
+                                    </p>
+                                )}
+                                <p className="text-center text-sm text-neutral-600">
+                                    {t('checkout.qrisInstructions')}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        void navigator.clipboard
+                                            .writeText(order.qrisString ?? '')
+                                            .then(() => setQrisCopied(true))
+                                            .catch(() => setQrisCopied(false))
+                                    }
+                                    className="inline-flex items-center gap-2 border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+                                >
+                                    {qrisCopied ? (
+                                        <Check className="size-4" />
+                                    ) : (
+                                        <Copy className="size-4" />
+                                    )}
+                                    {qrisCopied
+                                        ? t('checkout.qrisCopied')
+                                        : t('checkout.copyQris')}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="text-center">
+                                <p className="text-sm text-red-700">
+                                    {isQrisExpired
+                                        ? t('checkout.qrisExpiredMessage')
+                                        : t('checkout.qrisGenerateFailed')}
+                                </p>
+                                {canGenerateQris && (
+                                    <button
+                                        type="button"
+                                        disabled={qrisRegenerating}
+                                        onClick={() =>
+                                            router.post(
+                                                regenerate.url(order.id),
+                                                {},
+                                                {
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                    onStart: () =>
+                                                        setQrisRegenerating(
+                                                            true,
+                                                        ),
+                                                    onFinish: () =>
+                                                        setQrisRegenerating(
+                                                            false,
+                                                        ),
+                                                },
+                                            )
+                                        }
+                                        className="mt-3 bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                                    >
+                                        {qrisRegenerating
+                                            ? t('checkout.processing')
+                                            : t('checkout.qrisTryAgain')}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        <p className="text-center text-xs text-neutral-500">
+                            {t('checkout.paymentStatusAuto')}
+                        </p>
+                        <p className="text-center text-xs text-amber-700">
+                            {t('checkout.qrisCancelNote')}
+                        </p>
+                        <DialogFooter className="border-t border-neutral-200 pt-4">
+                            <button
+                                type="button"
+                                disabled={cancelSubmitting}
+                                onClick={() =>
+                                    router.post(
+                                        cancel.url(order.id),
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                            onStart: () =>
+                                                setCancelSubmitting(true),
+                                            onSuccess: () =>
+                                                setKeepCheckoutVisible(false),
+                                            onFinish: () =>
+                                                setCancelSubmitting(false),
+                                        },
+                                    )
+                                }
+                                className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                            >
+                                {cancelSubmitting
+                                    ? t('checkout.processing')
+                                    : t('checkout.cancelPayment')}
+                            </button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
             <Dialog
                 open={orderConfirmOpen}
                 onOpenChange={(open) => {
@@ -690,7 +1235,7 @@ export default function Checkout({
                 }}
             >
                 <DialogContent
-                    className="z-[90] bg-white text-neutral-900 sm:max-w-xl"
+                    className="z-[90] flex max-h-[92svh] flex-col gap-5 overflow-hidden bg-white text-neutral-900 sm:max-w-2xl"
                     overlayClassName="z-[80]"
                 >
                     <DialogHeader>
@@ -699,11 +1244,64 @@ export default function Checkout({
                             {t('checkout.confirmDescription')}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="max-h-64 space-y-4 overflow-y-auto">
+                    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+                        <dl className="grid overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-sm sm:grid-cols-2">
+                            <div className="min-w-0 border-b border-neutral-200 p-3 sm:border-r">
+                                <dt className="text-xs text-neutral-500">
+                                    {t('checkout.recipient')}
+                                </dt>
+                                <dd className="mt-1 font-medium break-words text-neutral-900">
+                                    {form.recipient_name}
+                                </dd>
+                            </div>
+                            <div className="min-w-0 border-b border-neutral-200 p-3">
+                                <dt className="text-xs text-neutral-500">
+                                    {t('checkout.phone')}
+                                </dt>
+                                <dd className="mt-1 font-medium break-words text-neutral-900">
+                                    {form.phone}
+                                </dd>
+                            </div>
+                            <div className="min-w-0 border-b border-neutral-200 p-3 sm:col-span-2">
+                                <dt className="text-xs text-neutral-500">
+                                    {t('checkout.address')}
+                                </dt>
+                                <dd className="mt-1 leading-5 break-words text-neutral-900">
+                                    {form.address}
+                                    {form.address_detail
+                                        ? `, ${form.address_detail}`
+                                        : ''}
+                                </dd>
+                            </div>
+                            <div className="min-w-0 border-b border-neutral-200 p-3 sm:col-span-2">
+                                <dt className="text-xs text-neutral-500">
+                                    {t('checkout.destination')}
+                                </dt>
+                                <dd className="mt-1 leading-5 break-words text-neutral-900">
+                                    {destination?.label}
+                                </dd>
+                            </div>
+                            <div className="min-w-0 border-b border-neutral-200 p-3 sm:border-r sm:border-b-0">
+                                <dt className="text-xs text-neutral-500">
+                                    {t('checkout.courier')}
+                                </dt>
+                                <dd className="mt-1 font-medium break-words text-neutral-900">
+                                    {selectedRate?.name} {selectedRate?.service}
+                                </dd>
+                            </div>
+                            <div className="min-w-0 p-3">
+                                <dt className="text-xs text-neutral-500">
+                                    {t('checkout.payment')}
+                                </dt>
+                                <dd className="mt-1 font-medium break-words text-neutral-900">
+                                    {selectedPaymentMethod?.name}
+                                </dd>
+                            </div>
+                        </dl>
                         {cart.map((line) => (
                             <div
                                 key={line.variant.id}
-                                className="flex items-center justify-between gap-4 text-sm"
+                                className="flex items-center justify-between gap-4 border-b border-neutral-200 pb-4 text-sm last:border-0 last:pb-0"
                             >
                                 <div className="flex min-w-0 items-center gap-3">
                                     <img
@@ -712,7 +1310,7 @@ export default function Checkout({
                                             '/storage/products/placeholder.svg'
                                         }
                                         alt=""
-                                        className="h-16 w-14 shrink-0 bg-neutral-100 object-cover"
+                                        className="h-20 w-16 shrink-0 rounded-sm bg-neutral-100 object-cover"
                                     />
                                     <div className="min-w-0">
                                         <p className="line-clamp-2 font-medium">
@@ -720,7 +1318,8 @@ export default function Checkout({
                                         </p>
                                         <p className="text-xs text-neutral-600">
                                             {t('cart.size')} {line.variant.size}{' '}
-                                            {t('cart.quantity')} {line.quantity}
+                                            · {t('cart.quantity')}{' '}
+                                            {line.quantity}
                                         </p>
                                     </div>
                                 </div>
@@ -733,25 +1332,26 @@ export default function Checkout({
                             </div>
                         ))}
                     </div>
-                    <div className="space-y-2 border-t pt-4 text-sm">
+                    <div className="shrink-0 space-y-2 border-t border-neutral-200 pt-4 text-sm">
                         <p className="flex justify-between">
-                            <span>
-                                {t('checkout.shipping')} · {selectedRate?.name}{' '}
-                                {selectedRate?.service}
-                            </span>
+                            <span>{t('checkout.subtotal')}</span>
+                            <span>{money(subtotal)}</span>
+                        </p>
+                        <p className="flex justify-between">
+                            <span>{t('checkout.shipping')}</span>
                             <span>{money(shipping)}</span>
                         </p>
-                        <p className="flex justify-between font-semibold">
+                        <p className="flex justify-between border-t pt-2 font-semibold">
                             <span>{t('checkout.total')}</span>
                             <span>{money(subtotal + shipping)}</span>
                         </p>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t border-neutral-200 pt-4">
                         <button
                             type="button"
                             disabled={orderSubmitting}
                             onClick={() => setOrderConfirmOpen(false)}
-                            className="border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                            className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50 sm:w-auto"
                         >
                             {t('common.cancel')}
                         </button>
@@ -759,11 +1359,11 @@ export default function Checkout({
                             type="button"
                             disabled={orderSubmitting}
                             onClick={confirmCheckout}
-                            className="bg-black px-4 py-2 text-sm text-white hover:bg-neutral-800 disabled:opacity-50"
+                            className="w-full bg-black px-5 py-3 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 sm:w-auto"
                         >
                             {orderSubmitting
                                 ? t('checkout.processing')
-                                : t('checkout.placeOrder')}
+                                : t('checkout.continueToPayment')}
                         </button>
                     </DialogFooter>
                 </DialogContent>
