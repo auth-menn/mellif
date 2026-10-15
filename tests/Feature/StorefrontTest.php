@@ -2,6 +2,7 @@
 
 use App\Models\CartItem;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -44,9 +45,26 @@ it('shows active products in the shop with database prices', function () {
 
 it('creates an order with server prices and reduces locked variant stock', function () {
     config(['services.rajaongkir.key' => 'test-key', 'services.rajaongkir.origin_id' => 1391]);
-    Http::fake(['*calculate/domestic-cost' => Http::response(['meta' => ['status' => 'success', 'code' => 200], 'data' => [[
-        'name' => 'JNE', 'code' => 'jne', 'service' => 'REG', 'description' => 'Regular', 'cost' => 18000, 'etd' => '2-3',
-    ]]])]);
+    config(['services.qrisly.key' => 'test-qrisly-key', 'services.qrisly.qris_id' => 123]);
+    Http::fake([
+        '*destination/domestic-destination*' => Http::response(['meta' => ['status' => 'success', 'code' => 200], 'data' => [[
+            'id' => 1376, 'label' => 'Kebayoran Baru, Jakarta Selatan, DKI Jakarta, 12110',
+        ]]]),
+        '*calculate/domestic-cost' => Http::response(['meta' => ['status' => 'success', 'code' => 200], 'data' => [[
+            'name' => 'JNE', 'code' => 'jne', 'service' => 'REG', 'description' => 'Regular', 'cost' => 18000, 'etd' => '2-3',
+        ]]]),
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
+            'meta' => ['message' => 'QRIS successfully generated', 'code' => 200, 'status' => 'success'],
+            'data' => [
+                'history_id' => 8759,
+                'qris_string' => '0002010102112661006299VALID_QRIS_PAYLOAD540410016304E8E2',
+                'original_amount' => 318000,
+                'final_amount' => 318001,
+                'payment_status' => 'unpaid',
+                'expiry_time' => '2026-10-14 11:57:54',
+            ],
+        ]),
+    ]);
     $user = User::factory()->create();
     $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
     $product = Product::query()->create([
@@ -63,24 +81,48 @@ it('creates an order with server prices and reduces locked variant stock', funct
     $courier = ShippingCourier::query()->create(['name' => 'JNE', 'code' => 'jne', 'flat_cost' => 18000, 'is_active' => true]);
     $payment = PaymentMethod::query()->create(['name' => 'QRIS', 'code' => 'qris', 'is_active' => true]);
 
+    $this->getJson(route('shipping.destinations', ['q' => 'Jakarta Selatan']))->assertOk();
+
     $this->actingAs($user)->post('/checkout', [
         'recipient_name' => 'Test Buyer',
         'phone' => '08123456789',
         'address' => 'Jakarta',
         'destination_id' => 1376,
-        'destination_label' => 'Kebayoran Baru, Jakarta Selatan, DKI Jakarta, 12110',
+        'destination_label' => 'Label tujuan palsu dari browser',
         'courier_code' => 'jne',
         'courier_service' => 'REG',
+        'expected_shipping_cost' => 18000,
         'payment_method_id' => $payment->id,
         'items' => [['variant_id' => $variant->id, 'qty' => 2]],
-    ])->assertRedirect(route('checkout.show'));
+    ])->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
 
-    $this->assertDatabaseHas('orders', ['user_id' => $user->id, 'subtotal' => 300000, 'shipping_cost' => 18000, 'total' => 318000]);
+    $this->assertDatabaseHas('orders', [
+        'user_id' => $user->id,
+        'subtotal' => 300000,
+        'shipping_cost' => 18000,
+        'total' => 318000,
+        'destination_label' => 'Kebayoran Baru, Jakarta Selatan, DKI Jakarta, 12110',
+        'payment_method_code' => 'qris',
+        'qrisly_history_id' => 8759,
+        'qris_final_amount' => 318001,
+        'qris_payment_status' => 'unpaid',
+    ]);
     Http::assertSent(fn ($request): bool => $request->url() === 'https://rajaongkir.komerce.id/api/v1/calculate/domestic-cost'
         && (int) $request['weight'] === 1000
         && (int) $request['origin'] === 1391
         && (int) $request['destination'] === 1376);
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/qrisly/generate-qris')
+        && $request['qris_id'] === 123
+        && $request['amount'] === 318000
+        && $request['unique_amount'] === true
+        && $request['output_type'] === 'string');
     $this->assertDatabaseHas('order_items', ['product_id' => $product->id, 'qty' => 2, 'unit_price' => 150000]);
+    $this->actingAs($user)
+        ->get(route('checkout.show', ['order' => Order::query()->value('order_number')]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('order.qrisImage', fn ($image): bool => is_string($image) && str_starts_with($image, 'data:image/svg+xml;base64,'))
+            ->where('order.qrisPaymentStatus', 'unpaid'));
     expect($variant->fresh()->stock)->toBe(2);
     expect($user->cartItems()->count())->toBe(0);
 });
@@ -103,7 +145,7 @@ it('rejects a shipping service that is not returned by the rate provider', funct
     $this->actingAs($user)->post('/checkout', [
         'recipient_name' => 'Test Buyer', 'phone' => '08123456789', 'address' => 'Jakarta',
         'destination_id' => 1376, 'destination_label' => 'Jakarta Selatan',
-        'courier_code' => 'jne', 'courier_service' => 'EXP', 'payment_method_id' => $payment->id,
+        'courier_code' => 'jne', 'courier_service' => 'EXP', 'expected_shipping_cost' => 18000, 'payment_method_id' => $payment->id,
         'items' => [['variant_id' => $variant->id, 'qty' => 1]],
     ])->assertSessionHasErrors('courier_service');
 
@@ -134,6 +176,7 @@ it('rejects checkout when quantity is fractional or exceeds current stock', func
         'destination_label' => 'Jakarta Selatan',
         'courier_code' => 'jne',
         'courier_service' => 'REG',
+        'expected_shipping_cost' => 18000,
         'payment_method_id' => $payment->id,
         'items' => [['variant_id' => $variant->id, 'qty' => 1.4]],
     ];
@@ -141,7 +184,7 @@ it('rejects checkout when quantity is fractional or exceeds current stock', func
     $this->actingAs($user)->post('/checkout', $checkoutData)->assertSessionHasErrors('items.0.qty');
 
     $checkoutData['items'][0]['qty'] = 2;
-    $this->actingAs($user)->post('/checkout', $checkoutData)->assertStatus(422);
+    $this->actingAs($user)->post('/checkout', $checkoutData)->assertSessionHasErrors('items');
 
     $this->assertDatabaseCount('orders', 0);
     expect($variant->fresh()->stock)->toBe(1);
