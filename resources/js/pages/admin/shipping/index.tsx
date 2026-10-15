@@ -15,9 +15,11 @@ type Courier = {
 export default function ShippingIndex({
     couriers,
     editing,
+    courierCodes,
 }: {
     couriers: { data: Courier[] };
     editing: Courier | null;
+    courierCodes: string[];
 }) {
     const { t } = useTranslation();
     const [pendingDelete, setPendingDelete] = useState<Courier | null>(null);
@@ -166,16 +168,23 @@ export default function ShippingIndex({
                     </label>
                     <label className="block text-sm">
                         {t('admin.code')}
-                        <input
+                        <select
                             value={form.data.code}
                             onChange={(event) =>
-                                form.setData(
-                                    'code',
-                                    event.target.value.toLowerCase(),
-                                )
+                                form.setData('code', event.target.value)
                             }
                             className="mt-2 w-full border border-input bg-card p-3 text-foreground"
-                        />
+                        >
+                            <option value="">Pilih kode kurir</option>
+                            {courierCodes.map((code) => (
+                                <option key={code} value={code}>
+                                    {code.toUpperCase()}
+                                </option>
+                            ))}
+                        </select>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                            Layanan (REG/YES/BEST) muncul otomatis di checkout.
+                        </span>
                         {form.errors.code && (
                             <span className="mt-1 block text-xs text-red-700">
                                 {form.errors.code}
