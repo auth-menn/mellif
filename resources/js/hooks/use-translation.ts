@@ -133,7 +133,12 @@ const messages = {
         'checkout.requiredNote': 'Wajib diisi',
         'checkout.confirmTitle': 'Konfirmasi pesanan',
         'checkout.confirmDescription':
-            'Periksa kembali produk dan total pesanan sebelum melanjutkan.',
+            'Periksa data penerima, pengiriman, metode pembayaran, dan total pesanan sebelum melanjutkan.',
+        'checkout.continueToPayment': 'Konfirmasi dan lanjut ke pembayaran',
+        'checkout.paymentStatusAuto':
+            'Status pembayaran diperbarui otomatis setelah pembayaran terkonfirmasi.',
+        'checkout.packing':
+            'Pesanan Anda sedang dikemas dan akan segera diproses untuk pengiriman.',
         'checkout.processing': 'Memproses...',
         'checkout.recipient': 'Nama penerima',
         'checkout.phone': 'Nomor HP',
@@ -141,8 +146,8 @@ const messages = {
         'checkout.addressDetail': 'Detail alamat (opsional)',
         'checkout.courier': 'Ekspedisi',
         'checkout.destination': 'Kecamatan / Kelurahan / Kode pos',
-        'checkout.destinationPlaceholder':
-            'Cari kecamatan, kelurahan, atau kode pos',
+        'checkout.destinationPlaceholder': 'Contoh: Kebomas Gresik',
+        'checkout.destinationRequired': 'Pilih tujuan dari hasil pencarian.',
         'checkout.searchingDestination': 'Mencari tujuan…',
         'checkout.destinationFailed': 'Tujuan gagal dimuat. Coba lagi.',
         'checkout.loadingRates': 'Menghitung ongkir…',
@@ -161,7 +166,29 @@ const messages = {
         'checkout.thanks': 'Terima kasih sudah berbelanja.',
         'checkout.orderNumber': 'Nomor order Anda',
         'checkout.paymentLater':
-            'Pembayaran QRIS dan unggah bukti pembayaran akan tersedia pada fase berikutnya.',
+            'Pesanan Anda tersimpan. Silakan ikuti petunjuk pembayaran yang tersedia untuk metode ini.',
+        'checkout.qrisPayment': 'Pembayaran QRIS',
+        'checkout.amountToPay': 'Nominal yang harus dibayar',
+        'checkout.qrisExpires': 'Berlaku sampai',
+        'checkout.qrisTimeRemaining': 'Waktu tersisa',
+        'checkout.qrisExpiredMessage':
+            'QRIS sudah kedaluwarsa. Generate QRIS baru untuk melanjutkan pembayaran.',
+        'checkout.qrisInstructions':
+            'Salin kode QRIS ini untuk melanjutkan pembayaran di aplikasi pembayaran Anda.',
+        'checkout.copyQris': 'Salin kode QRIS',
+        'checkout.qrisCopied': 'Kode QRIS tersalin',
+        'checkout.qrisGenerateFailed':
+            'QRISLY tidak memberikan kode QR yang valid. Periksa QRIS ID dan akun QRIS di dashboard QRISLY, lalu coba lagi.',
+        'checkout.qrisTryAgain': 'Generate QRIS',
+        'checkout.cancelPayment': 'Batal pembayaran',
+        'checkout.qrisCancelNote':
+            'Order dibatalkan, tetapi QRIS mungkin masih bisa dibayar sampai kedaluwarsa.',
+        'checkout.orderCancelled': 'Pesanan dibatalkan',
+        'checkout.qrisStatus.unpaid': 'Menunggu pembayaran',
+        'checkout.qrisStatus.paid': 'Pembayaran selesai',
+        'checkout.qrisStatus.expired': 'QRIS kedaluwarsa',
+        'checkout.qrisStatus.cancelled': 'Pembayaran dibatalkan',
+        'checkout.qrisStatus.failed': 'QRIS gagal dibuat',
         'checkout.continueShopping': 'Lanjut belanja',
         'checkout.authRequired': 'Login diperlukan untuk melanjutkan pesanan.',
         'admin.label': 'CMS',
@@ -443,7 +470,12 @@ const messages = {
         'checkout.requiredNote': 'Required · address details are optional',
         'checkout.confirmTitle': 'Confirm your order',
         'checkout.confirmDescription':
-            'Review the products and order total before continuing.',
+            'Review the recipient, shipping, payment method, and order total before continuing.',
+        'checkout.continueToPayment': 'Confirm and continue to payment',
+        'checkout.paymentStatusAuto':
+            'Payment status updates automatically after confirmation.',
+        'checkout.packing':
+            'Your order is being packed and will soon be prepared for shipping.',
         'checkout.processing': 'Processing...',
         'checkout.recipient': 'Recipient name',
         'checkout.phone': 'Phone number',
@@ -451,8 +483,9 @@ const messages = {
         'checkout.addressDetail': 'Address details (optional)',
         'checkout.courier': 'Courier',
         'checkout.destination': 'District / Subdistrict / Postal code',
-        'checkout.destinationPlaceholder':
-            'Search district, subdistrict, or postal code',
+        'checkout.destinationPlaceholder': 'Example: Kebomas Gresik',
+        'checkout.destinationRequired':
+            'Select a destination from the results.',
         'checkout.searchingDestination': 'Searching destinations…',
         'checkout.destinationFailed':
             'Could not load destinations. Please try again.',
@@ -474,7 +507,29 @@ const messages = {
         'checkout.thanks': 'Thank you for shopping with us.',
         'checkout.orderNumber': 'Your order number',
         'checkout.paymentLater':
-            'QRIS payment and proof upload will be available in a later phase.',
+            'Your order is saved. Follow the payment instructions available for this method.',
+        'checkout.qrisPayment': 'QRIS payment',
+        'checkout.amountToPay': 'Amount to pay',
+        'checkout.qrisExpires': 'Expires at',
+        'checkout.qrisTimeRemaining': 'Time remaining',
+        'checkout.qrisExpiredMessage':
+            'This QRIS has expired. Generate a new QRIS to continue payment.',
+        'checkout.qrisInstructions':
+            'Copy this QRIS code to continue payment in your payment app.',
+        'checkout.copyQris': 'Copy QRIS code',
+        'checkout.qrisCopied': 'QRIS code copied',
+        'checkout.qrisGenerateFailed':
+            'QRISLY did not return a valid QR code. Check the QRIS ID and QR account in the QRISLY dashboard, then try again.',
+        'checkout.qrisTryAgain': 'Generate QRIS again',
+        'checkout.cancelPayment': 'Cancel payment',
+        'checkout.qrisCancelNote':
+            'The order will be cancelled, but this QRIS may remain payable until it expires.',
+        'checkout.orderCancelled': 'Order cancelled',
+        'checkout.qrisStatus.unpaid': 'Waiting for payment',
+        'checkout.qrisStatus.paid': 'Payment complete',
+        'checkout.qrisStatus.expired': 'QRIS expired',
+        'checkout.qrisStatus.cancelled': 'Payment cancelled',
+        'checkout.qrisStatus.failed': 'QRIS generation failed',
         'checkout.continueShopping': 'Continue shopping',
         'checkout.authRequired': 'Log in to continue with your order.',
         'admin.label': 'CMS',
