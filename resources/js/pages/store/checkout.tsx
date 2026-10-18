@@ -1,6 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
 import type { CartLine } from '@/types/store';
 import { money } from '@/types/store';
 import { store as placeOrder } from '@/routes/checkout';
@@ -55,8 +54,19 @@ type CheckoutOrder = {
     orderNumber: string;
     status: string;
     total: number;
+    subtotal: number;
+    shippingCost: number;
+    shippingCourier: string;
+    shippingService: string | null;
+    items: {
+        name: string;
+        size: string;
+        quantity: number;
+        unitPrice: number;
+        imageUrl: string | null;
+    }[];
     paymentMethodCode: string | null;
-    qrisString: string | null;
+    hasQris: boolean;
     qrisImage: string | null;
     qrisFinalAmount: number | null;
     qrisPaymentStatus: string | null;
@@ -97,6 +107,14 @@ export default function Checkout({
     )?.user;
     const [cart, setCart] = useState<CartLine[]>([]);
     const [paymentId, setPaymentId] = useState(paymentMethods[0]?.id ?? 0);
+    const [deliveryMethod, setDeliveryMethod] = useState<'courier' | 'direct_cod'>(
+        'courier',
+    );
+    const selectedPaymentMethod = paymentMethods.find(
+        (method) => method.id === paymentId,
+    );
+    const isDirectCod = deliveryMethod === 'direct_cod';
+    const requiresShipping = !isDirectCod;
     const [form, setForm] = useState({
         recipient_name: user?.name ?? '',
         phone: user?.phone ?? '',
@@ -119,7 +137,6 @@ export default function Checkout({
     const [qrisSecondsRemaining, setQrisSecondsRemaining] = useState<
         number | null
     >(null);
-    const [qrisCopied, setQrisCopied] = useState(false);
     const [cancelSubmitting, setCancelSubmitting] = useState(false);
     const [qrisRegenerating, setQrisRegenerating] = useState(false);
     const [destinationQuery, setDestinationQuery] = useState('');
@@ -136,7 +153,6 @@ export default function Checkout({
 
     useEffect(() => {
         setPaymentStatus(qrisPaymentStatus(order?.qrisPaymentStatus));
-        setQrisCopied(false);
     }, [order?.id, order?.qrisPaymentStatus]);
 
     useEffect(() => {
@@ -169,7 +185,7 @@ export default function Checkout({
     }, [order?.id, order?.qrisExpiryTime, paymentStatus]);
 
     useEffect(() => {
-        if (!order?.id || !order.qrisString || paymentStatus !== 'unpaid')
+        if (!order?.id || !order.hasQris || paymentStatus !== 'unpaid')
             return;
 
         let active = true;
@@ -193,6 +209,9 @@ export default function Checkout({
                     setPaymentStatus(
                         result.payment_status as QrisPaymentStatus,
                     );
+                    if (result.payment_status === 'paid') {
+                        window.dispatchEvent(new Event('mellif-cart-updated'));
+                    }
                 }
             } catch {
                 // Keep the last known payment status when the network is unavailable.
@@ -208,7 +227,7 @@ export default function Checkout({
             active = false;
             window.clearInterval(interval);
         };
-    }, [order?.id, order?.qrisString, paymentStatus]);
+    }, [order?.id, order?.hasQris, paymentStatus]);
 
     useEffect(() => {
         if (!user) return;
@@ -244,8 +263,24 @@ export default function Checkout({
     }, [user?.id]);
 
     useEffect(() => {
+        if (!isDirectCod) return;
+
+        setDestination(null);
+        setDestinationQuery('');
+        setDestinationOptions([]);
+        setDestinationError('');
+        setRates([]);
+        setRatesError('');
+        setSelectedRateKey('');
+    }, [isDirectCod]);
+
+    useEffect(() => {
         const query = destinationQuery.trim();
-        if (query.length < 4 || destination?.label === query) {
+        if (
+            !requiresShipping ||
+            query.length < 4 ||
+            destination?.label === query
+        ) {
             setDestinationOptions([]);
             setDestinationLoading(false);
             return;
@@ -286,7 +321,7 @@ export default function Checkout({
             window.clearTimeout(timeout);
             controller.abort();
         };
-    }, [destinationQuery, destination?.label]);
+    }, [destinationQuery, destination?.label, requiresShipping]);
 
     const cartSignature = useMemo(
         () =>
@@ -297,7 +332,7 @@ export default function Checkout({
         [cart],
     );
     useEffect(() => {
-        if (!destination || !cart.length) {
+        if (!requiresShipping || !destination || !cart.length) {
             setRates([]);
             setSelectedRateKey('');
             setRatesLoading(false);
@@ -349,7 +384,7 @@ export default function Checkout({
         };
         void loadRates();
         return () => controller.abort();
-    }, [destination?.id, cartSignature]);
+    }, [destination?.id, cartSignature, requiresShipping]);
 
     const subtotal = cart.reduce(
         (sum, line) => sum + line.product.discounted_price * line.quantity,
@@ -359,10 +394,7 @@ export default function Checkout({
         rates.find(
             (rate) => `${rate.code}:${rate.service}` === selectedRateKey,
         ) ?? null;
-    const selectedPaymentMethod = paymentMethods.find(
-        (method) => method.id === paymentId,
-    );
-    const shipping = selectedRate?.cost ?? 0;
+    const shipping = requiresShipping ? (selectedRate?.cost ?? 0) : 0;
 
     const confirmCartRemoval = async (): Promise<void> => {
         if (!pendingCartRemoval) return;
@@ -391,17 +423,22 @@ export default function Checkout({
     };
 
     const submitOrder = (): void => {
-        if (!destination || !selectedRate) return;
+        if (requiresShipping && (!destination || !selectedRate)) return;
         setErrors({});
         router.post(
             placeOrder.url(),
             {
                 ...form,
-                destination_id: destination.id,
-                destination_label: destination.label,
-                courier_code: selectedRate.code,
-                courier_service: selectedRate.service,
-                expected_shipping_cost: selectedRate.cost,
+                delivery_method: deliveryMethod,
+                ...(requiresShipping && destination && selectedRate
+                    ? {
+                          destination_id: destination.id,
+                          destination_label: destination.label,
+                          courier_code: selectedRate.code,
+                          courier_service: selectedRate.service,
+                          expected_shipping_cost: selectedRate.cost,
+                      }
+                    : {}),
                 payment_method_id: paymentId,
                 items: cart.map((line) => ({
                     variant_id: line.variant.id,
@@ -449,6 +486,7 @@ export default function Checkout({
 
     if (order && !keepCheckoutVisible) {
         const isQrisOrder = order.paymentMethodCode === 'qris';
+        const isCodOrder = order.paymentMethodCode === 'cod';
         const isOrderCancelled =
             isQrisOrder && ['cancelled', 'rejected'].includes(order.status);
         const isPaymentComplete =
@@ -460,25 +498,95 @@ export default function Checkout({
                     title={`${isPaymentComplete ? t('checkout.accepted') : t('checkout.qrisPayment')} · Mellif Studio`}
                 />
                 {isPaymentComplete ? (
-                    <main className="mx-auto min-h-screen max-w-3xl px-6 pt-40 pb-20 text-center">
-                        <p className="text-xs tracking-[.25em] text-neutral-500 uppercase">
-                            {t('checkout.accepted')}
-                        </p>
-                        <h1 className="mt-5 text-4xl font-medium">
-                            {t('checkout.thanks')}
-                        </h1>
-                        <p className="mt-5 text-neutral-600">
-                            {t('checkout.orderNumber')}
-                        </p>
-                        <p className="mt-2 text-xl font-semibold">
-                            {order.orderNumber}
-                        </p>
-                        {isQrisOrder && (
-                            <div className="mx-auto mt-8 max-w-xl rounded border border-green-200 bg-green-50 p-6 text-left">
-                                <p className="font-semibold text-green-800">
-                                    {t('checkout.qrisStatus.paid')}
+                    <main className="mx-auto min-h-screen max-w-5xl px-5 pt-24 pb-16 sm:px-8 sm:pt-32 lg:px-10 lg:pt-36">
+                        <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_24px_80px_-40px_rgba(0,0,0,0.28)]">
+                            <div className="bg-neutral-950 px-6 py-8 text-center text-white sm:px-10 sm:py-10">
+                                <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-7 text-emerald-300">
+                                        <path d="m5 12.5 4.5 4.5L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+                                    </svg>
+                                </div>
+                                <p className="mt-5 text-xs font-medium tracking-[.22em] text-white/60 uppercase">
+                                    {t('checkout.accepted')}
                                 </p>
-                                <p className="mt-2 text-sm text-green-800">
+                                <h1 className="mt-2 text-2xl font-medium sm:text-3xl">
+                                    {t('checkout.paymentSuccessTitle')}
+                                </h1>
+                                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/70">
+                                    {t('checkout.paymentSuccessDescription')}
+                                </p>
+                            </div>
+                            <div className="grid gap-x-10 gap-y-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)] lg:p-10">
+                                <div className="space-y-6">
+                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-neutral-50 px-4 py-3">
+                                    <div>
+                                        <p className="text-xs text-neutral-500">{t('checkout.orderNumber')}</p>
+                                        <p className="mt-1 font-semibold tracking-wide text-neutral-900">{order.orderNumber}</p>
+                                    </div>
+                                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
+                                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                                        {t('checkout.qrisStatus.paid')}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h2 className="text-sm font-semibold text-neutral-900">{t('checkout.orderDetails')}</h2>
+                                    <div className="mt-3 divide-y divide-neutral-100 rounded-xl border border-neutral-200 px-4">
+                                        {order.items.map((item, index) => (
+                                            <div key={`${item.name}-${item.size}-${index}`} className="flex items-center justify-between gap-4 py-3 text-sm">
+                                                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                                                    <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-neutral-100 sm:size-20">
+                                                        {item.imageUrl ? (
+                                                            <img src={item.imageUrl} alt={item.name} className="size-full object-cover" loading="lazy" />
+                                                        ) : (
+                                                            <div className="flex size-full items-center justify-center text-[10px] text-neutral-400">Mellif</div>
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="line-clamp-2 font-medium text-neutral-900">{item.name}</p>
+                                                        <p className="mt-1 text-xs text-neutral-500">{t('cart.size')} {item.size} · {t('cart.quantity')}: {item.quantity}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="shrink-0 text-neutral-700">{money(item.unitPrice * item.quantity)}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                                        <div className="rounded-xl border border-neutral-200 p-4">
+                                            <p className="text-xs text-neutral-500">{t('checkout.amountPaid')}</p>
+                                            <p className="mt-1 text-lg font-semibold text-neutral-900">{money(order.qrisFinalAmount ?? order.total)}</p>
+                                            <p className="mt-1 text-xs text-neutral-500">QRIS</p>
+                                        </div>
+                                        <div className="rounded-xl border border-neutral-200 p-4">
+                                            <p className="text-xs text-neutral-500">{t('checkout.orderProgress')}</p>
+                                            <p className="mt-1 font-semibold text-neutral-900">{t('checkout.packingStatus')}</p>
+                                            <p className="mt-1 text-xs leading-5 text-neutral-500">{t('checkout.packing')}</p>
+                                        </div>
+                                    </div>
+                                    <dl className="space-y-2 rounded-xl border border-neutral-200 p-4 text-sm">
+                                        <div className="flex justify-between gap-4 text-neutral-600"><dt>{t('checkout.subtotal')}</dt><dd>{money(order.subtotal)}</dd></div>
+                                        <div className="flex justify-between gap-4 text-neutral-600"><dt>{t('checkout.shipping')}</dt><dd>{money(order.shippingCost)}</dd></div>
+                                        <div className="flex justify-between gap-4 border-t border-neutral-200 pt-3 font-semibold text-neutral-900"><dt>{t('checkout.total')}</dt><dd>{money(order.total)}</dd></div>
+                                    </dl>
+                                    <div className="rounded-xl border border-neutral-200 px-4 py-3 text-sm">
+                                    <p className="text-xs text-neutral-500">{t('checkout.deliveryMethod')}</p>
+                                    <p className="mt-1 font-medium text-neutral-900">{order.shippingCourier}{order.shippingService ? ` · ${order.shippingService}` : ''}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        {isCodOrder && (
+                            <div className="mx-auto mt-8 max-w-xl rounded border border-neutral-200 bg-neutral-50 p-6 text-left">
+                                <p className="font-semibold text-neutral-900">
+                                    COD
+                                </p>
+                                <p className="mt-2 text-sm text-neutral-700">
+                                    {t('checkout.codInstructions')}
+                                </p>
+                                <p className="mt-2 text-sm text-neutral-700">
                                     {t('checkout.packing')}
                                 </p>
                             </div>
@@ -572,7 +680,7 @@ export default function Checkout({
                                             </p>
                                         )}
                                 </div>
-                                {order.qrisString &&
+                                {order.hasQris &&
                                 paymentStatus === 'unpaid' &&
                                 !isQrisExpired ? (
                                     <div className="flex flex-col items-center gap-4">
@@ -607,31 +715,6 @@ export default function Checkout({
                                         <p className="text-center text-sm text-neutral-600">
                                             {t('checkout.qrisInstructions')}
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                void navigator.clipboard
-                                                    .writeText(
-                                                        order.qrisString ?? '',
-                                                    )
-                                                    .then(() =>
-                                                        setQrisCopied(true),
-                                                    )
-                                                    .catch(() =>
-                                                        setQrisCopied(false),
-                                                    )
-                                            }
-                                            className="inline-flex items-center gap-2 border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
-                                        >
-                                            {qrisCopied ? (
-                                                <Check className="size-4" />
-                                            ) : (
-                                                <Copy className="size-4" />
-                                            )}
-                                            {qrisCopied
-                                                ? t('checkout.qrisCopied')
-                                                : t('checkout.copyQris')}
-                                        </button>
                                     </div>
                                 ) : (
                                     <div className="text-center">
@@ -680,9 +763,11 @@ export default function Checkout({
                                 <p className="text-center text-xs text-neutral-500">
                                     {t('checkout.paymentStatusAuto')}
                                 </p>
-                                <p className="text-center text-xs text-amber-700">
-                                    {t('checkout.qrisCancelNote')}
-                                </p>
+                                {order.hasQris && (
+                                    <p className="text-center text-xs text-amber-700">
+                                        {t('checkout.qrisCancelNote')}
+                                    </p>
+                                )}
                                 <DialogFooter className="border-t border-neutral-200 pt-4">
                                     <button
                                         type="button"
@@ -737,7 +822,12 @@ export default function Checkout({
                             [
                                 ['recipient_name', t('checkout.recipient')],
                                 ['phone', t('checkout.phone')],
-                                ['address', t('checkout.address')],
+                                [
+                                    'address',
+                                    isDirectCod
+                                        ? t('checkout.codMeetupLocation')
+                                        : t('checkout.address'),
+                                ],
                                 ['address_detail', t('checkout.addressDetail')],
                             ] as const
                         ).map(([key, label]) => (
@@ -785,6 +875,68 @@ export default function Checkout({
                                 )}
                             </label>
                         ))}
+                        <label className="block text-sm">
+                            <span>
+                                {t('checkout.deliveryMethod')}
+                                <span
+                                    className="ml-1 text-red-600"
+                                    aria-hidden="true"
+                                >
+                                    *
+                                </span>
+                            </span>
+                            <select
+                                required
+                                value={deliveryMethod}
+                                onChange={(event) =>
+                                    setDeliveryMethod(
+                                        event.target.value as
+                                            | 'courier'
+                                            | 'direct_cod',
+                                    )
+                                }
+                                className="mt-2 w-full border border-neutral-300 px-3 py-3"
+                            >
+                                <option value="courier">
+                                    {t('checkout.deliveryCourier')}
+                                </option>
+                                <option value="direct_cod">
+                                    {t('checkout.deliveryCod')}
+                                </option>
+                            </select>
+                        </label>
+                        <label className="block text-sm">
+                            <span>
+                                {t('checkout.payment')}
+                                <span
+                                    className="ml-1 text-red-600"
+                                    aria-hidden="true"
+                                >
+                                    *
+                                </span>
+                            </span>
+                            <select
+                                required
+                                value={paymentId}
+                                onChange={(event) =>
+                                    setPaymentId(Number(event.target.value))
+                                }
+                                className="mt-2 w-full border border-neutral-300 px-3 py-3"
+                            >
+                                {paymentMethods.map((method) => (
+                                    <option key={method.id} value={method.id}>
+                                        {method.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        {isDirectCod && (
+                            <p className="border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
+                                {t('checkout.codDirectInstructions')}
+                            </p>
+                        )}
+                        {requiresShipping && (
+                            <>
                         <div className="relative">
                             <label className="block text-sm">
                                 {t('checkout.destination')}{' '}
@@ -934,31 +1086,8 @@ export default function Checkout({
                                 </p>
                             )}
                         </fieldset>
-                        <label className="block text-sm">
-                            <span>
-                                {t('checkout.payment')}
-                                <span
-                                    className="ml-1 text-red-600"
-                                    aria-hidden="true"
-                                >
-                                    *
-                                </span>
-                            </span>
-                            <select
-                                required
-                                value={paymentId}
-                                onChange={(event) =>
-                                    setPaymentId(Number(event.target.value))
-                                }
-                                className="mt-2 w-full border border-neutral-300 px-3 py-3"
-                            >
-                                {paymentMethods.map((method) => (
-                                    <option key={method.id} value={method.id}>
-                                        {method.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                            </>
+                        )}
                     </section>
                     <aside className="h-fit border border-neutral-200 p-5 md:sticky md:top-20 md:z-30 md:self-start">
                         <h2 className="mb-5 text-lg font-medium">
@@ -1044,9 +1173,15 @@ export default function Checkout({
                                 <span>{money(subtotal)}</span>
                             </p>
                             <p className="flex justify-between">
-                                <span>{t('checkout.shipping')}</span>
                                 <span>
-                                    {selectedRate ? money(shipping) : '—'}
+                                    {isDirectCod
+                                        ? t('checkout.noShipping')
+                                        : t('checkout.shipping')}
+                                </span>
+                                <span>
+                                    {requiresShipping && !selectedRate
+                                        ? '—'
+                                        : money(shipping)}
                                 </span>
                             </p>
                             <p className="flex justify-between border-t pt-3 font-semibold">
@@ -1056,7 +1191,9 @@ export default function Checkout({
                         </div>
                         <button
                             disabled={
-                                !cart.length || !destination || !selectedRate
+                                !cart.length ||
+                                (requiresShipping &&
+                                    (!destination || !selectedRate))
                             }
                             onClick={() => setOrderConfirmOpen(true)}
                             className="mt-5 w-full bg-black py-4 text-sm font-medium text-white disabled:opacity-40"
@@ -1103,7 +1240,7 @@ export default function Checkout({
                                     </p>
                                 )}
                         </div>
-                        {order.qrisString &&
+                        {order.hasQris &&
                         paymentStatus === 'unpaid' &&
                         !isQrisExpired ? (
                             <div className="flex flex-col items-center gap-4">
@@ -1134,25 +1271,6 @@ export default function Checkout({
                                 <p className="text-center text-sm text-neutral-600">
                                     {t('checkout.qrisInstructions')}
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        void navigator.clipboard
-                                            .writeText(order.qrisString ?? '')
-                                            .then(() => setQrisCopied(true))
-                                            .catch(() => setQrisCopied(false))
-                                    }
-                                    className="inline-flex items-center gap-2 border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
-                                >
-                                    {qrisCopied ? (
-                                        <Check className="size-4" />
-                                    ) : (
-                                        <Copy className="size-4" />
-                                    )}
-                                    {qrisCopied
-                                        ? t('checkout.qrisCopied')
-                                        : t('checkout.copyQris')}
-                                </button>
                             </div>
                         ) : (
                             <div className="text-center">
@@ -1195,9 +1313,11 @@ export default function Checkout({
                         <p className="text-center text-xs text-neutral-500">
                             {t('checkout.paymentStatusAuto')}
                         </p>
-                        <p className="text-center text-xs text-amber-700">
-                            {t('checkout.qrisCancelNote')}
-                        </p>
+                        {order.hasQris && (
+                            <p className="text-center text-xs text-amber-700">
+                                {t('checkout.qrisCancelNote')}
+                            </p>
+                        )}
                         <DialogFooter className="border-t border-neutral-200 pt-4">
                             <button
                                 type="button"
@@ -1264,7 +1384,9 @@ export default function Checkout({
                             </div>
                             <div className="min-w-0 border-b border-neutral-200 p-3 sm:col-span-2">
                                 <dt className="text-xs text-neutral-500">
-                                    {t('checkout.address')}
+                                    {isDirectCod
+                                        ? t('checkout.codMeetupLocation')
+                                        : t('checkout.address')}
                                 </dt>
                                 <dd className="mt-1 leading-5 break-words text-neutral-900">
                                     {form.address}
@@ -1273,22 +1395,27 @@ export default function Checkout({
                                         : ''}
                                 </dd>
                             </div>
-                            <div className="min-w-0 border-b border-neutral-200 p-3 sm:col-span-2">
-                                <dt className="text-xs text-neutral-500">
-                                    {t('checkout.destination')}
-                                </dt>
-                                <dd className="mt-1 leading-5 break-words text-neutral-900">
-                                    {destination?.label}
-                                </dd>
-                            </div>
-                            <div className="min-w-0 border-b border-neutral-200 p-3 sm:border-r sm:border-b-0">
-                                <dt className="text-xs text-neutral-500">
-                                    {t('checkout.courier')}
-                                </dt>
-                                <dd className="mt-1 font-medium break-words text-neutral-900">
-                                    {selectedRate?.name} {selectedRate?.service}
-                                </dd>
-                            </div>
+                            {requiresShipping && (
+                                <div className="min-w-0 border-b border-neutral-200 p-3 sm:col-span-2">
+                                    <dt className="text-xs text-neutral-500">
+                                        {t('checkout.destination')}
+                                    </dt>
+                                    <dd className="mt-1 leading-5 break-words text-neutral-900">
+                                        {destination?.label}
+                                    </dd>
+                                </div>
+                            )}
+                            {requiresShipping && (
+                                <div className="min-w-0 border-b border-neutral-200 p-3 sm:border-r sm:border-b-0">
+                                    <dt className="text-xs text-neutral-500">
+                                        {t('checkout.courier')}
+                                    </dt>
+                                    <dd className="mt-1 font-medium break-words text-neutral-900">
+                                        {selectedRate?.name}{' '}
+                                        {selectedRate?.service}
+                                    </dd>
+                                </div>
+                            )}
                             <div className="min-w-0 p-3">
                                 <dt className="text-xs text-neutral-500">
                                     {t('checkout.payment')}
@@ -1298,6 +1425,11 @@ export default function Checkout({
                                 </dd>
                             </div>
                         </dl>
+                        {isDirectCod && (
+                            <p className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
+                                {t('checkout.codDirectInstructions')}
+                            </p>
+                        )}
                         {cart.map((line) => (
                             <div
                                 key={line.variant.id}
@@ -1338,7 +1470,11 @@ export default function Checkout({
                             <span>{money(subtotal)}</span>
                         </p>
                         <p className="flex justify-between">
-                            <span>{t('checkout.shipping')}</span>
+                            <span>
+                                {isDirectCod
+                                    ? t('checkout.noShipping')
+                                    : t('checkout.shipping')}
+                            </span>
                             <span>{money(shipping)}</span>
                         </p>
                         <p className="flex justify-between border-t pt-2 font-semibold">

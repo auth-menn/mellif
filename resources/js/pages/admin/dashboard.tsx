@@ -1,9 +1,25 @@
 import { Head } from '@inertiajs/react';
-import { money } from '@/types/store';
-import { useTranslation, type TranslationKey } from '@/hooks/use-translation';
 import { AdminStatusBadge, orderStatusTone } from '@/components/admin/status-badge';
+import { useTranslation, type TranslationKey } from '@/hooks/use-translation';
+import { money } from '@/types/store';
 
-type Order = { id: number; order_number: string; total: number; status: string; created_at: string; user: { name: string } | null };
+type Order = {
+    id: number;
+    order_number: string;
+    total: number;
+    status: string;
+    created_at: string;
+    user: { name: string } | null;
+};
+
+type ManualReviewOrder = {
+    id: number;
+    order_number: string;
+    total: number;
+    created_at: string;
+    customer: string | null;
+    reason: 'paid_after_cancellation' | 'insufficient_stock';
+};
 
 const statusKeys: Record<string, TranslationKey> = {
     pending_payment: 'admin.waitingPayment',
@@ -13,9 +29,179 @@ const statusKeys: Record<string, TranslationKey> = {
     cancelled: 'admin.cancelled',
 };
 
-export default function AdminDashboard({ stats, recentOrders }: { stats: { orders_today: number; pending_orders: number; products: number; low_stock: number }; recentOrders: Order[] }) {
+export default function AdminDashboard({
+    stats,
+    recentOrders,
+    manualReviewOrders,
+}: {
+    stats: {
+        orders_today: number;
+        pending_orders: number;
+        products: number;
+        low_stock: number;
+    };
+    recentOrders: Order[];
+    manualReviewOrders: ManualReviewOrder[];
+}) {
     const { t } = useTranslation();
-    const cards = [[t('admin.ordersToday'), stats.orders_today], [t('admin.pendingOrders'), stats.pending_orders], [t('admin.totalProducts'), stats.products], [t('admin.lowStock'), stats.low_stock]] as const;
+    const cards = [
+        [t('admin.ordersToday'), stats.orders_today],
+        [t('admin.pendingOrders'), stats.pending_orders],
+        [t('admin.totalProducts'), stats.products],
+        [t('admin.lowStock'), stats.low_stock],
+    ] as const;
 
-    return <><Head title={`${t('admin.dashboard')} — Mellif Studio`} /><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{cards.map(([label, value]) => <article key={label} className="border border-border bg-card p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-3 text-3xl font-semibold text-foreground">{value}</p></article>)}</div><section className="mt-8 overflow-hidden border border-border bg-card"><div className="border-b border-border p-5"><h2 className="font-semibold text-foreground">{t('admin.recentOrders')}</h2></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted text-muted-foreground"><tr><th className="p-4 font-semibold">{t('admin.orderNumber')}</th><th className="p-4 font-semibold">{t('admin.customer')}</th><th className="p-4 font-semibold">{t('checkout.total')}</th><th className="p-4 font-semibold">{t('admin.status')}</th></tr></thead><tbody>{recentOrders.map((order) => <tr key={order.id} className="border-t border-border"><td className="p-4 font-medium text-foreground">{order.order_number}</td><td className="p-4 text-foreground">{order.user?.name ?? '—'}</td><td className="p-4 text-foreground">{money(order.total)}</td><td className="p-4"><AdminStatusBadge tone={orderStatusTone(order.status)}>{t(statusKeys[order.status] ?? 'admin.status')}</AdminStatusBadge></td></tr>)}{recentOrders.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">{t('admin.noOrders')}</td></tr>}</tbody></table></div></section></>;
+    return (
+        <>
+            <Head title={`${t('admin.dashboard')} — Mellif Studio`} />
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {cards.map(([label, value]) => (
+                    <article
+                        key={label}
+                        className="border border-border bg-card p-5"
+                    >
+                        <p className="text-sm text-muted-foreground">{label}</p>
+                        <p className="mt-3 text-3xl font-semibold text-foreground">
+                            {value}
+                        </p>
+                    </article>
+                ))}
+            </div>
+
+            <section className="mt-8 overflow-hidden border border-border bg-card">
+                <div className="border-b border-border p-5">
+                    <h2 className="font-semibold text-foreground">
+                        {t('admin.manualReviewOrders')}
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {t('admin.manualReviewReason')}
+                    </p>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-muted text-muted-foreground">
+                            <tr>
+                                <th className="p-4 font-semibold">
+                                    {t('admin.orderNumber')}
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    {t('admin.customer')}
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    {t('checkout.total')}
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    {t('admin.status')}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {manualReviewOrders.map((order) => (
+                                <tr
+                                    key={order.id}
+                                    className="border-t border-border"
+                                >
+                                    <td className="p-4 font-medium text-foreground">
+                                        {order.order_number}
+                                    </td>
+                                    <td className="p-4 text-foreground">
+                                        {order.customer ?? '—'}
+                                    </td>
+                                    <td className="p-4 text-foreground">
+                                        {money(order.total)}
+                                    </td>
+                                    <td className="p-4">
+                                        <AdminStatusBadge tone="warning">
+                                            {t(
+                                                order.reason ===
+                                                    'paid_after_cancellation'
+                                                    ? 'admin.manualReviewCancelled'
+                                                    : 'admin.manualReviewStock',
+                                            )}
+                                        </AdminStatusBadge>
+                                    </td>
+                                </tr>
+                            ))}
+                            {manualReviewOrders.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={4}
+                                        className="p-8 text-center text-muted-foreground"
+                                    >
+                                        {t('admin.noOrders')}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mt-8 overflow-hidden border border-border bg-card">
+                <div className="border-b border-border p-5">
+                    <h2 className="font-semibold text-foreground">
+                        {t('admin.recentOrders')}
+                    </h2>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-muted text-muted-foreground">
+                            <tr>
+                                <th className="p-4 font-semibold">
+                                    {t('admin.orderNumber')}
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    {t('admin.customer')}
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    {t('checkout.total')}
+                                </th>
+                                <th className="p-4 font-semibold">
+                                    {t('admin.status')}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {recentOrders.map((order) => (
+                                <tr
+                                    key={order.id}
+                                    className="border-t border-border"
+                                >
+                                    <td className="p-4 font-medium text-foreground">
+                                        {order.order_number}
+                                    </td>
+                                    <td className="p-4 text-foreground">
+                                        {order.user?.name ?? '—'}
+                                    </td>
+                                    <td className="p-4 text-foreground">
+                                        {money(order.total)}
+                                    </td>
+                                    <td className="p-4">
+                                        <AdminStatusBadge
+                                            tone={orderStatusTone(order.status)}
+                                        >
+                                            {t(
+                                                statusKeys[order.status] ??
+                                                    'admin.status',
+                                            )}
+                                        </AdminStatusBadge>
+                                    </td>
+                                </tr>
+                            ))}
+                            {recentOrders.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={4}
+                                        className="p-8 text-center text-muted-foreground"
+                                    >
+                                        {t('admin.noOrders')}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </>
+    );
 }

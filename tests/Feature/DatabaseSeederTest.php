@@ -27,7 +27,7 @@ it('seeds all development records idempotently and keeps admin roles separate', 
     $this->assertDatabaseCount('product_variants', 48);
     $this->assertDatabaseCount('product_images', 12);
     $this->assertDatabaseCount('shipping_couriers', 3);
-    $this->assertDatabaseCount('payment_methods', 1);
+    $this->assertDatabaseCount('payment_methods', 2);
     $this->assertDatabaseCount('store_settings', 2);
     $this->assertDatabaseCount('users', 6);
     $this->assertDatabaseCount('orders', 5);
@@ -71,7 +71,7 @@ it('does not create demo users or orders in production', function () {
     (new DemoOrderSeeder)->run();
 
     $this->assertDatabaseCount('shipping_couriers', 3);
-    $this->assertDatabaseCount('payment_methods', 1);
+    $this->assertDatabaseCount('payment_methods', 2);
     $this->assertDatabaseCount('store_settings', 2);
     $this->assertDatabaseCount('users', 1);
     $this->assertDatabaseCount('products', 0);

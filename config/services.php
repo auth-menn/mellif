@@ -35,6 +35,7 @@ return [
         'key' => env('QRISLY_KEY'),
         'qris_id' => env('QRISLY_QRIS_ID'),
         'base_url' => env('QRISLY_BASE_URL', 'https://api-sandbox.collaborator.komerce.id/user'),
+        'webhook_token' => env('QRISLY_WEBHOOK_TOKEN'),
     ],
 
     'mellif' => [

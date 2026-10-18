@@ -6,8 +6,10 @@ use App\Http\Requests\StoreCartItemRequest;
 use App\Http\Requests\SyncCartRequest;
 use App\Http\Requests\UpdateCartItemRequest;
 use App\Models\CartItem;
+use App\Models\Order;
 use App\Models\ProductVariant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +18,32 @@ class CartController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        return response()->json(['items' => $this->cartItems($request->user())]);
+        $user = $request->user();
+        $orderItems = 'items:id,order_id,product_name,size,qty,unit_price';
+
+        return response()->json([
+            'items' => $this->cartItems($user),
+            'orders' => [
+                'awaitingPayment' => $this->cartOrderSummaries(
+                    Order::query()->whereBelongsTo($user)
+                        ->where('payment_method_code', 'qris')
+                        ->where('status', 'pending_payment')
+                        ->whereIn('qris_payment_status', ['unpaid', 'expired', 'failed', 'cancelled'])
+                        ->with($orderItems)
+                        ->latest('created_at')
+                        ->limit(10)
+                        ->get(),
+                ),
+                'paid' => $this->cartOrderSummaries(
+                    Order::query()->whereBelongsTo($user)
+                        ->where('qris_payment_status', 'paid')
+                        ->with($orderItems)
+                        ->latest('created_at')
+                        ->limit(10)
+                        ->get(),
+                ),
+            ],
+        ]);
     }
 
     public function store(StoreCartItemRequest $request): JsonResponse
@@ -119,6 +146,27 @@ class CartController extends Controller
     {
         return $user->cartItems()->with('variant.product.images', 'variant.product.category')->get()
             ->map(fn (CartItem $item): array => $this->cartItemData($item))->all();
+    }
+
+    /** @param Collection<int, Order> $orders
+     * @return array<int, array<string, mixed>>
+     */
+    private function cartOrderSummaries(Collection $orders): array
+    {
+        return $orders->map(fn (Order $order): array => [
+            'id' => $order->id,
+            'orderNumber' => $order->order_number,
+            'total' => $order->total,
+            'status' => $order->status,
+            'paymentStatus' => $order->qris_payment_status,
+            'createdAt' => $order->created_at?->toIso8601String(),
+            'items' => $order->items->map(fn ($item): array => [
+                'productName' => $item->product_name,
+                'size' => $item->size,
+                'quantity' => $item->qty,
+                'unitPrice' => $item->unit_price,
+            ])->all(),
+        ])->all();
     }
 
     /** @return array<string, mixed> */

@@ -6,7 +6,7 @@ import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { login } from '@/routes';
+import { home } from '@/routes';
 import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
@@ -56,7 +56,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
 
                 <div className="space-x-1 text-center text-sm text-muted-foreground">
                     <span>Ingat password Anda?</span>
-                    <TextLink href={login()}>Kembali ke login</TextLink>
+                    <TextLink href={home.url({ query: { auth: 'login' } })}>Kembali ke login</TextLink>
                 </div>
             </div>
         </>

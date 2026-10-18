@@ -64,6 +64,7 @@ function stockConsistencyCheckoutPayload(array $context, array $items): array
         'recipient_name' => 'Test Buyer',
         'phone' => '08123456789',
         'address' => 'Jakarta',
+        'delivery_method' => 'courier',
         'destination_id' => 1376,
         'destination_label' => 'Jakarta Selatan',
         'courier_code' => 'jne',
@@ -124,12 +125,84 @@ describe('checkout stock consistency', function () {
                 ['variant_id' => $variant->id, 'qty' => 3],
                 ['variant_id' => $variant->id, 'qty' => 2],
             ]))
-            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
+            ->assertRedirect(route('checkout.show'))
+            ->assertSessionHas('order_number', Order::query()->value('order_number'));
 
         expect($variant->fresh()->stock)->toBe(0)
             ->and($variant->fresh()->stock)->toBeGreaterThanOrEqual(0);
         $this->assertDatabaseCount('orders', 1);
         $this->assertDatabaseCount('order_items', 2);
+    });
+
+    it('creates a QRIS order for direct COD handover with zero shipping and no pre-payment stock deduction', function () {
+        $context = makeStockConsistencyCheckoutContext();
+        $context['payment']->delete();
+        $context['payment'] = PaymentMethod::query()->create([
+            'name' => 'QRIS', 'code' => 'qris', 'is_active' => true,
+        ]);
+        $product = makeStockConsistencyProduct();
+        $variant = makeStockConsistencyVariant($product, 5);
+        CartItem::query()->create([
+            'user_id' => $context['user']->id,
+            'product_variant_id' => $variant->id,
+            'quantity' => 1,
+        ]);
+
+        config([
+            'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id',
+            'services.qrisly.key' => 'test-key',
+            'services.qrisly.qris_id' => '1297',
+        ]);
+        Http::fake([
+            'https://api-sandbox.collaborator.komerce.id/api/v1/qrisly/generate-qris' => Http::response([
+                'meta' => ['status' => 'success', 'code' => 200],
+                'data' => [
+                    'history_id' => 12345,
+                    'qris_string' => '0002010102112661006299VALID_QRIS540410016304E8E2',
+                    'original_amount' => 100000,
+                    'final_amount' => 100001,
+                    'payment_status' => 'unpaid',
+                    'expiry_time' => '2026-10-18 12:00:00',
+                ],
+            ]),
+        ]);
+        $payload = stockConsistencyCheckoutPayload($context, [
+            ['variant_id' => $variant->id, 'qty' => 1],
+        ]);
+        $payload['delivery_method'] = 'direct_cod';
+        unset(
+            $payload['destination_id'],
+            $payload['destination_label'],
+            $payload['courier_code'],
+            $payload['courier_service'],
+            $payload['expected_shipping_cost'],
+        );
+
+        $this->actingAs($context['user'])
+            ->post('/checkout', $payload)
+            ->assertRedirect(route('checkout.show'));
+
+        $this->assertDatabaseHas('orders', [
+            'payment_method' => 'QRIS',
+            'payment_method_code' => 'qris',
+            'status' => 'pending_payment',
+            'shipping_courier' => 'COD',
+            'shipping_cost' => 0,
+            'destination_id' => null,
+            'destination_label' => 'COD',
+            'shipping_service' => null,
+            'total' => 100000,
+            'stock_deducted' => false,
+            'qrisly_history_id' => 12345,
+            'qris_original_amount' => 100000,
+            'qris_final_amount' => 100001,
+            'qris_payment_status' => 'unpaid',
+        ]);
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'calculate/domestic-cost'));
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'generate-qris')
+            && $request['amount'] === 100000);
+        expect($variant->fresh()->stock)->toBe(5)
+            ->and($context['user']->cartItems()->count())->toBe(1);
     });
 
     it('returns 422 without creating an order for a missing variant', function () {
@@ -179,7 +252,8 @@ describe('checkout stock consistency', function () {
             ->post('/checkout', stockConsistencyCheckoutPayload($context, [
                 ['variant_id' => $purchasedVariant->id, 'qty' => 1],
             ]))
-            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
+            ->assertRedirect(route('checkout.show'))
+            ->assertSessionHas('order_number', Order::query()->value('order_number'));
 
         $this->assertDatabaseMissing('cart_items', ['id' => $purchasedCartItem->id]);
         $this->assertDatabaseHas('cart_items', ['id' => $otherVariantCartItem->id, 'quantity' => 2]);

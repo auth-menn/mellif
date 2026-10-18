@@ -93,8 +93,8 @@ it('stores multiple home videos and page two images for the storefront', functio
             UploadedFile::fake()->create('campaign-two.webm', 100, 'video/webm'),
         ],
         'page2_images' => [
-            UploadedFile::fake()->image('look-one.jpg'),
-            UploadedFile::fake()->image('look-two.webp'),
+            UploadedFile::fake()->image('look-one.jpg', 1672, 941),
+            UploadedFile::fake()->image('look-two.webp', 1200, 800),
         ],
     ])->assertRedirect();
 
@@ -110,7 +110,11 @@ it('stores multiple home videos and page two images for the storefront', functio
 
     $this->get(route('home'))->assertInertia(fn ($page) => $page
         ->has('heroVideos', 2)
-        ->has('productSlides', 2));
+        ->has('productSlides', 2)
+        ->where('productSlides.0.width', 1672)
+        ->where('productSlides.0.height', 941)
+        ->where('productSlides.1.width', 1200)
+        ->where('productSlides.1.height', 800));
 });
 
 it('removes selected home media and keeps the rest', function () {

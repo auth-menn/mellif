@@ -6,10 +6,8 @@ beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::registration());
 });
 
-test('registration screen can be rendered', function () {
-    $response = $this->get(route('register'));
-
-    $response->assertOk();
+test('registration page route is not available', function () {
+    $this->get('/register')->assertNotFound();
 });
 
 test('new users can register', function () {

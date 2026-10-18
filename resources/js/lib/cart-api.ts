@@ -1,7 +1,28 @@
 import type { CartLine, Product, StoreVariant } from '@/types/store';
 import cartRoutes from '@/routes/cart';
 
-type ServerCart = { items: CartLine[] };
+export type CartOrderSummary = {
+    id: number;
+    orderNumber: string;
+    total: number;
+    status: string;
+    paymentStatus: string | null;
+    createdAt: string | null;
+    items: {
+        productName: string;
+        size: string;
+        quantity: number;
+        unitPrice: number;
+    }[];
+};
+
+export type ServerCartOverview = {
+    items: CartLine[];
+    orders: {
+        awaitingPayment: CartOrderSummary[];
+        paid: CartOrderSummary[];
+    };
+};
 
 function xsrfHeaders(): Record<string, string> {
     const cookie = document.cookie.split('; ').find((item) => item.startsWith('XSRF-TOKEN='));
@@ -28,10 +49,13 @@ async function cartRequest<T>(url: string, method: string, payload?: unknown): P
 }
 
 export async function loadServerCart(): Promise<CartLine[]> {
+    return (await loadServerCartOverview()).items;
+}
+
+export async function loadServerCartOverview(): Promise<ServerCartOverview> {
     const response = await fetch(cartRoutes.index.url(), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error('Keranjang gagal dimuat.');
-    const data = await response.json() as ServerCart;
-    return data.items;
+    return await response.json() as ServerCartOverview;
 }
 
 export async function saveCartLine(product: Product, variant: StoreVariant, quantity: number, isAuthenticated: boolean): Promise<void> {
