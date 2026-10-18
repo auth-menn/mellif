@@ -43,9 +43,34 @@ it('shows active products in the shop with database prices', function () {
         ->where('products.data.0.stock', 4));
 });
 
-it('creates an order with server prices and reduces locked variant stock', function () {
+it('shows active products with zero stock in the shop and filters them out when in-stock is selected', function () {
+    $category = Category::query()->create(['name' => 'Accessories', 'slug' => 'accessories']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Sold Out Cap',
+        'slug' => 'sold-out-cap',
+        'description' => 'A sold out product',
+        'price' => 50000,
+        'is_active' => true,
+    ]);
+    ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'One Size', 'stock' => 0]);
+
+    $this->get('/shop')
+        ->assertInertia(fn ($page) => $page
+            ->where('products.data.0.name', 'Sold Out Cap')
+            ->where('products.data.0.stock', 0));
+
+    $this->get('/shop?in_stock=1')
+        ->assertInertia(fn ($page) => $page->where('products.total', 0));
+});
+
+it('creates an order with server prices without reducing stock before QRIS payment', function () {
     config(['services.rajaongkir.key' => 'test-key', 'services.rajaongkir.origin_id' => 1391]);
-    config(['services.qrisly.key' => 'test-qrisly-key', 'services.qrisly.qris_id' => 123]);
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
     Http::fake([
         '*destination/domestic-destination*' => Http::response(['meta' => ['status' => 'success', 'code' => 200], 'data' => [[
             'id' => 1376, 'label' => 'Kebayoran Baru, Jakarta Selatan, DKI Jakarta, 12110',
@@ -94,7 +119,8 @@ it('creates an order with server prices and reduces locked variant stock', funct
         'expected_shipping_cost' => 18000,
         'payment_method_id' => $payment->id,
         'items' => [['variant_id' => $variant->id, 'qty' => 2]],
-    ])->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
+    ])->assertRedirect(route('checkout.show'))
+        ->assertSessionHas('order_number', Order::query()->value('order_number'));
 
     $this->assertDatabaseHas('orders', [
         'user_id' => $user->id,
@@ -123,8 +149,8 @@ it('creates an order with server prices and reduces locked variant stock', funct
         ->assertInertia(fn ($page) => $page
             ->where('order.qrisImage', fn ($image): bool => is_string($image) && str_starts_with($image, 'data:image/svg+xml;base64,'))
             ->where('order.qrisPaymentStatus', 'unpaid'));
-    expect($variant->fresh()->stock)->toBe(2);
-    expect($user->cartItems()->count())->toBe(0);
+    expect($variant->fresh()->stock)->toBe(4);
+    expect($user->cartItems()->count())->toBe(1);
 });
 
 it('rejects a shipping service that is not returned by the rate provider', function () {

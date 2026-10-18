@@ -157,7 +157,7 @@ it('rejects an expected shipping cost that differs from the server quote', funct
 });
 
 it('requires authentication for admin routes and forbids non-admin users', function () {
-    $this->get(route('admin.shipping.index'))->assertRedirect(route('login'));
+    $this->get(route('admin.shipping.index'))->assertRedirect(route('home', ['auth' => 'login'], absolute: false));
     $this->actingAs(User::factory()->create())->get(route('admin.shipping.index'))->assertForbidden();
 });
 

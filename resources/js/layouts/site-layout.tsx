@@ -1,15 +1,18 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, House, Info, LoaderCircle, Menu, Search, ShoppingBag, Store, UserRound, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Check, House, Info, LoaderCircle, Menu, Search, ShoppingBag, Store, UserRound, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CartLine } from '@/types/store';
 import { money } from '@/types/store';
-import { loadServerCart, readGuestCart, removeServerCartLine } from '@/lib/cart-api';
+import { loadServerCartOverview, readGuestCart, removeServerCartLine, type CartOrderSummary } from '@/lib/cart-api';
+import { announceAuthChange } from '@/lib/auth-sync';
 import { about, logout } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { edit as profileEdit } from '@/routes/profile';
 import { index as shopIndex } from '@/routes/shop';
 import { show as checkoutShow } from '@/routes/checkout';
 import AuthModal from '@/components/store/auth-modal';
+import AuthStateSync from '@/components/store/auth-state-sync';
+import FlagIcon from '@/components/store/flag-icon';
 import SearchOverlay from '@/components/store/search-overlay';
 import CartRemoveDialog from '@/components/store/cart-remove-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,8 +27,10 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const user = (props.auth as { user?: { id: number; name: string; is_admin?: boolean } | null } | undefined)?.user;
     const [menuOpen, setMenuOpen] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
+    const [cartSection, setCartSection] = useState<'cart' | 'awaitingPayment' | 'paid'>('cart');
     const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
     const [authOpen, setAuthOpen] = useState(false);
+    const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [notification, setNotification] = useState('');
@@ -36,11 +41,74 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const [languageOpen, setLanguageOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
     const [cart, setCart] = useState<CartLine[]>([]);
+    const [cartOrders, setCartOrders] = useState<{ awaitingPayment: CartOrderSummary[]; paid: CartOrderSummary[] }>({ awaitingPayment: [], paid: [] });
     const [pendingCartRemoval, setPendingCartRemoval] = useState<CartLine | null>(null);
     const [cartRemovalProcessing, setCartRemovalProcessing] = useState(false);
     const userRef = useRef(user);
     userRef.current = user;
     const { language, setLanguage, t } = useTranslation();
+
+    const refreshCart = useCallback(async (): Promise<void> => {
+        if (userRef.current) {
+            const overview = await loadServerCartOverview().catch(() => ({
+                items: [],
+                orders: { awaitingPayment: [], paid: [] },
+            }));
+            setCart(overview.items);
+            setCartOrders(overview.orders);
+            setCartCount(overview.items.reduce((sum, line) => sum + line.quantity, 0));
+            return;
+        }
+
+        const lines = readGuestCart();
+        setCart(lines);
+        setCartOrders({ awaitingPayment: [], paid: [] });
+        setCartCount(lines.reduce((sum, line) => sum + line.quantity, 0));
+    }, []);
+
+    useEffect(() => {
+        const pageUrl = new URL(window.location.href);
+        if (pageUrl.searchParams.get('auth_error') === 'google_state') {
+            setNotification(t('auth.googleSessionExpired'));
+            window.setTimeout(() => setNotification(''), 3500);
+            pageUrl.searchParams.delete('auth_error');
+        }
+        const requestedMode = pageUrl.searchParams.get('auth');
+        if (requestedMode === 'login' || requestedMode === 'register') {
+            setAuthInitialMode(requestedMode);
+            setAuthOpen(true);
+            pageUrl.searchParams.delete('auth');
+        }
+        if (pageUrl.searchParams.has('auth_error') || requestedMode === 'login' || requestedMode === 'register') {
+            const query = pageUrl.searchParams.toString();
+            window.history.replaceState(window.history.state, '', `${pageUrl.pathname}${query ? `?${query}` : ''}${pageUrl.hash}`);
+        }
+    }, [t, url]);
+
+    useEffect(() => {
+        if (user) setAuthOpen(false);
+    }, [user]);
+
+    useEffect(() => {
+        const removeHttpExceptionListener = router.on('httpException', (event) => {
+            const status = event.detail.response.status;
+
+            if (status === 401) {
+                event.preventDefault();
+                setAuthInitialMode('login');
+                setAuthOpen(true);
+                window.dispatchEvent(new CustomEvent('mellif-notification', { detail: t('auth.loginRequired') }));
+            }
+
+            if (status === 419) {
+                event.preventDefault();
+                window.dispatchEvent(new CustomEvent('mellif-notification', { detail: t('auth.sessionExpired') }));
+                router.reload({ only: ['auth'] });
+            }
+        });
+
+        return () => removeHttpExceptionListener();
+    }, [t]);
 
     useEffect(() => {
         let animationFrame = 0;
@@ -65,22 +133,14 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     }, []);
 
     useEffect(() => {
-        let active = true;
-        const refresh = async (): Promise<void> => {
-            const lines = userRef.current ? await loadServerCart().catch(() => []) : readGuestCart();
-            if (!active) return;
-            setCart(lines);
-            setCartCount(lines.reduce((sum, line) => sum + line.quantity, 0));
-        };
-        void refresh();
-        window.addEventListener('storage', refresh);
-        window.addEventListener('mellif-cart-updated', refresh);
+        void refreshCart();
+        window.addEventListener('storage', refreshCart);
+        window.addEventListener('mellif-cart-updated', refreshCart);
         return () => {
-            active = false;
-            window.removeEventListener('storage', refresh);
-            window.removeEventListener('mellif-cart-updated', refresh);
+            window.removeEventListener('storage', refreshCart);
+            window.removeEventListener('mellif-cart-updated', refreshCart);
         };
-    }, [user?.id]);
+    }, [refreshCart, user?.id]);
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent): void => {
@@ -123,6 +183,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         router.post(logout.url(), {}, {
             onStart: () => setLogoutProcessing(true),
             onSuccess: () => {
+                announceAuthChange();
                 setLogoutConfirmOpen(false);
                 window.dispatchEvent(new CustomEvent('mellif-notification', { detail: t('nav.logoutSuccess') }));
             },
@@ -165,6 +226,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 
     return (
         <div className="min-h-screen bg-white text-[#171815]">
+            <AuthStateSync />
             <header className={`fixed left-1/2 z-40 w-full -translate-x-1/2 text-white will-change-[width,height,top] transition-[width,height,top,border-radius,border-color,box-shadow] duration-500 ease-out ${floatingNavbarScrolled ? 'top-2 h-11 w-[calc(100%-16px)] max-w-[1800px] rounded-2xl border border-white/15 bg-black shadow-lg shadow-black/20 sm:top-3 sm:h-12 sm:w-[calc(100%-24px)] md:w-[calc(100%-32px)] md:h-14 landscape:max-xl:h-10' : 'top-0 h-12 rounded-none border border-transparent bg-black shadow-none sm:h-14 md:h-16 landscape:max-xl:h-12'}`}>
                 <div className="mx-auto grid h-full max-w-[1800px] grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-1 px-2 sm:grid-cols-3 sm:gap-2 sm:px-4 md:px-7">
                     <button aria-label={t('nav.openMenu')} onClick={() => setMenuOpen(true)} className="grid size-9 place-items-center"><Menu size={22} strokeWidth={1.5} /></button>
@@ -181,18 +243,18 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                     </Link>
                     <div className="flex shrink-0 items-center justify-self-end gap-0.5 sm:gap-2 md:gap-4">
                         <div className="relative">
-                            <button type="button" onClick={() => setLanguageOpen(!languageOpen)} aria-label={t('nav.language')} aria-expanded={languageOpen} title={t('nav.language')} className="flex h-9 min-w-9 items-center justify-center gap-1.5 px-1.5 py-1 text-sm">
-                                <span aria-hidden="true">{language === 'EN' ? '🇬🇧' : '🇮🇩'}</span><span className="hidden sm:inline landscape:max-xl:hidden">{language}</span>
+                            <button type="button" onClick={() => setLanguageOpen(!languageOpen)} aria-label={t(language === 'ID' ? 'nav.languageCurrentIndonesia' : 'nav.languageCurrentEnglish')} aria-expanded={languageOpen} title={t('nav.language')} className="flex h-9 min-w-9 items-center justify-center gap-1.5 px-1.5 py-1 text-sm">
+                                <FlagIcon language={language} /><span>{language}</span>
                             </button>
                             {languageOpen && <div className="absolute right-0 top-full z-50 mt-3 w-52 rounded-xl border border-white/70 bg-white/85 p-2 text-sm text-neutral-900 shadow-xl backdrop-blur-xl" role="menu" aria-label={t('nav.language')}>
                                 <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('nav.language')}</p>
-                                <button type="button" role="menuitemradio" aria-checked={language === 'ID'} onClick={() => selectLanguage('ID')} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/60 ${language === 'ID' ? 'font-semibold' : ''}`}><span>🇮🇩&nbsp; Bahasa Indonesia</span>{language === 'ID' && <span aria-hidden="true">✓</span>}</button>
-                                <button type="button" role="menuitemradio" aria-checked={language === 'EN'} onClick={() => selectLanguage('EN')} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/60 ${language === 'EN' ? 'font-semibold' : ''}`}><span>🇬🇧&nbsp; English</span>{language === 'EN' && <span aria-hidden="true">✓</span>}</button>
+                                <button type="button" role="menuitemradio" aria-checked={language === 'ID'} onClick={() => selectLanguage('ID')} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/60 ${language === 'ID' ? 'font-semibold' : ''}`}><span className="flex items-center gap-3"><FlagIcon language="ID" />{t('nav.languageIndonesia')}</span>{language === 'ID' && <Check aria-hidden="true" size={14} />}</button>
+                                <button type="button" role="menuitemradio" aria-checked={language === 'EN'} onClick={() => selectLanguage('EN')} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/60 ${language === 'EN' ? 'font-semibold' : ''}`}><span className="flex items-center gap-3"><FlagIcon language="EN" />{t('nav.languageEnglish')}</span>{language === 'EN' && <Check aria-hidden="true" size={14} />}</button>
                             </div>}
                         </div>
                         <button type="button" onClick={() => { setSearchQuery(''); setSearchOpen(true); }} aria-label={t('nav.search')} className="grid size-9 place-items-center"><Search size={21} strokeWidth={1.5} /></button>
-                        <button onClick={() => setCartOpen(true)} aria-label={`${t('nav.cart')}, ${cartCount} ${t('cart.quantity').toLowerCase()}`} className="relative grid size-9 place-items-center"><ShoppingBag size={21} strokeWidth={1.5} />{cartCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">{cartCount}</span>}</button>
-                        {user ? <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen} aria-label={t('nav.account')} className="grid size-9 place-items-center"><UserRound size={21} strokeWidth={1.5} /></button> : <button onClick={() => setAuthOpen(true)} aria-label={t('nav.login')} className="grid size-9 place-items-center"><UserRound size={21} strokeWidth={1.5} /></button>}
+                        <button onClick={() => { void refreshCart(); setCartSection('cart'); setCartOpen(true); }} aria-label={`${t('nav.cart')}, ${cartCount} ${t('cart.quantity').toLowerCase()}`} className="relative grid size-9 place-items-center"><ShoppingBag size={21} strokeWidth={1.5} />{cartCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">{cartCount}</span>}</button>
+                        {user ? <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen} aria-label={t('nav.account')} className="grid size-9 place-items-center"><UserRound size={21} strokeWidth={1.5} /></button> : <button onClick={() => { setAuthInitialMode('login'); setAuthOpen(true); }} aria-label={t('nav.login')} className="grid size-9 place-items-center"><UserRound size={21} strokeWidth={1.5} /></button>}
                     </div>
                 </div>
             </header>
@@ -231,10 +293,37 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                     </a>
                 </footer>
             </aside>
-            <aside className={`fixed inset-y-0 right-0 z-[51] flex w-[min(420px,92vw)] flex-col bg-white text-black shadow-xl transition-transform ${cartOpen ? 'translate-x-0' : 'translate-x-full'}`} aria-hidden={!cartOpen}>
-                <div className="flex items-center justify-between border-b p-6"><h2 className="text-lg font-semibold">{t('cart.title')} ({cartCount})</h2><button aria-label={t('common.close')} onClick={() => setCartOpen(false)}><X /></button></div>
-                <div className="flex-1 space-y-5 overflow-y-auto p-6 text-sm text-neutral-600">{cart.length === 0 ? <p>{t('cart.empty')}</p> : cart.map((line) => <div key={line.variant.id} className="flex gap-4 border-b border-neutral-200 pb-5 last:border-b-0 last:pb-0"><img src={line.product.images[0] ?? '/storage/products/placeholder.svg'} alt="" className="h-24 w-20 bg-neutral-100 object-cover" /><div className="min-w-0 flex-1"><p className="font-medium text-black">{line.product.name}</p><p className="mt-1">{t('cart.size')} {line.variant.size}</p><p className="mt-1 text-black">{money(line.product.discounted_price * line.quantity)}</p><button onClick={() => setPendingCartRemoval(line)} className="mt-2 text-xs text-red-600 underline transition-colors hover:text-red-800">{t('cart.remove')}</button></div><span aria-label={`${t('cart.quantity')}: ${line.quantity}`} className="grid size-7 shrink-0 place-items-center rounded-full bg-black text-xs text-white">{line.quantity}</span></div>)}</div>
-                <button type="button" disabled={!cart.length} onClick={() => setCheckoutConfirmOpen(true)} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{t('cart.checkout')}</button>
+            <aside className={`fixed inset-y-0 right-0 z-[51] flex w-[min(560px,96vw)] flex-col bg-white text-black shadow-xl transition-transform ${cartOpen ? 'translate-x-0' : 'translate-x-full'}`} aria-hidden={!cartOpen}>
+                <div className="border-b px-5 pt-5">
+                    <div className="flex items-center justify-between pb-4"><h2 className="text-lg font-semibold">{t('cart.title')}</h2><button aria-label={t('common.close')} onClick={() => setCartOpen(false)}><X /></button></div>
+                    <div className={`grid ${user ? 'grid-cols-3' : 'grid-cols-1'}`} role="tablist" aria-label={t('cart.title')}>
+                        <button id="cart-tab-items" type="button" role="tab" aria-selected={cartSection === 'cart'} aria-controls="cart-panel" onClick={() => setCartSection('cart')} className={`min-h-12 border-b-2 px-2 pb-2 text-center text-xs font-medium leading-tight transition-colors ${cartSection === 'cart' ? 'border-black text-black' : 'border-transparent text-neutral-500 hover:text-black'}`}>{t('cart.currentItems')} <span className="text-neutral-400">{cartCount}</span></button>
+                        {user && <button id="cart-tab-awaiting" type="button" role="tab" aria-selected={cartSection === 'awaitingPayment'} aria-controls="cart-panel" onClick={() => setCartSection('awaitingPayment')} className={`min-h-12 border-b-2 px-2 pb-2 text-center text-xs font-medium leading-tight transition-colors ${cartSection === 'awaitingPayment' ? 'border-black text-black' : 'border-transparent text-neutral-500 hover:text-black'}`}>{t('cart.awaitingPayment')} <span className="text-neutral-400">{cartOrders.awaitingPayment.length}</span></button>}
+                        {user && <button id="cart-tab-paid" type="button" role="tab" aria-selected={cartSection === 'paid'} aria-controls="cart-panel" onClick={() => setCartSection('paid')} className={`min-h-12 border-b-2 px-2 pb-2 text-center text-xs font-medium leading-tight transition-colors ${cartSection === 'paid' ? 'border-black text-black' : 'border-transparent text-neutral-500 hover:text-black'}`}>{t('cart.paymentHistory')} <span className="text-neutral-400">{cartOrders.paid.length}</span></button>}
+                    </div>
+                </div>
+                <div id="cart-panel" role="tabpanel" aria-labelledby={cartSection === 'cart' ? 'cart-tab-items' : cartSection === 'awaitingPayment' ? 'cart-tab-awaiting' : 'cart-tab-paid'} className="flex-1 overflow-y-auto p-6 text-sm text-neutral-600">
+                    {cartSection === 'cart' && <section className="space-y-4">
+                        <h3 className="font-semibold text-black">{t('cart.currentItems')} ({cartCount})</h3>
+                        {cart.length === 0 ? <p>{t('cart.empty')}</p> : cart.map((line) => <div key={line.variant.id} className="flex gap-4 border-b border-neutral-200 pb-5 last:border-b-0 last:pb-0"><img src={line.product.images[0] ?? '/storage/products/placeholder.svg'} alt="" className="h-24 w-20 bg-neutral-100 object-cover" /><div className="min-w-0 flex-1"><p className="font-medium text-black">{line.product.name}</p><p className="mt-1">{t('cart.size')} {line.variant.size}</p><p className="mt-1 text-black">{money(line.product.discounted_price * line.quantity)}</p><button onClick={() => setPendingCartRemoval(line)} className="mt-2 text-xs text-red-600 underline transition-colors hover:text-red-800">{t('cart.remove')}</button></div><span aria-label={`${t('cart.quantity')}: ${line.quantity}`} className="grid size-7 shrink-0 place-items-center rounded-full bg-black text-xs text-white">{line.quantity}</span></div>)}
+                    </section>}
+                    {user && cartSection === 'awaitingPayment' && <section className="space-y-4">
+                        <h3 className="font-semibold text-black">{t('cart.awaitingPayment')} ({cartOrders.awaitingPayment.length})</h3>
+                        {cartOrders.awaitingPayment.length === 0 ? <p>{t('cart.noAwaitingPayment')}</p> : cartOrders.awaitingPayment.map((order) => <div key={order.id} className="space-y-3 rounded border border-neutral-200 p-4">
+                            <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-black">{order.orderNumber}</p><p className="mt-1 text-xs">{t('checkout.qrisStatus.unpaid')}</p></div><span className="shrink-0 font-medium text-black">{money(order.total)}</span></div>
+                            <ul className="space-y-1 text-xs">{order.items.map((item, index) => <li key={`${order.id}-${index}`}>{item.productName} · {t('cart.size')} {item.size} · {t('cart.quantity')} {item.quantity}</li>)}</ul>
+                            <Link onClick={() => setCartOpen(false)} href={checkoutShow.url({ query: { order: order.orderNumber } })} className="inline-flex bg-black px-3 py-2 text-xs font-medium text-white">{t('cart.resumePayment')}</Link>
+                        </div>)}
+                    </section>}
+                    {user && cartSection === 'paid' && <section className="space-y-4">
+                        <h3 className="font-semibold text-black">{t('cart.paymentHistory')} ({cartOrders.paid.length})</h3>
+                        {cartOrders.paid.length === 0 ? <p>{t('cart.noPaymentHistory')}</p> : cartOrders.paid.map((order) => <div key={order.id} className="space-y-3 rounded border border-neutral-200 p-4">
+                            <div className="flex items-start justify-between gap-3"><div><p className="font-medium text-black">{order.orderNumber}</p><p className="mt-1 text-xs text-green-700">{t('cart.paymentReceived')}</p></div><span className="shrink-0 font-medium text-black">{money(order.total)}</span></div>
+                            <ul className="space-y-1 text-xs">{order.items.map((item, index) => <li key={`${order.id}-${index}`}>{item.productName} · {t('cart.size')} {item.size} · {t('cart.quantity')} {item.quantity}</li>)}</ul>
+                        </div>)}
+                    </section>}
+                </div>
+                {cartSection === 'cart' && <button type="button" disabled={!cart.length} onClick={() => setCheckoutConfirmOpen(true)} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{t('cart.checkout')}</button>}
             </aside>
             <Dialog open={checkoutConfirmOpen} onOpenChange={setCheckoutConfirmOpen}>
                 <DialogContent className="z-[90] bg-white text-neutral-900 sm:max-w-xl" overlayClassName="z-[80]">
@@ -279,7 +368,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 }}
                 onConfirm={() => { void confirmCartRemoval(); }}
             />
-            <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
+            <AuthModal open={authOpen} onOpenChange={setAuthOpen} initialMode={authInitialMode} />
         </div>
     );
 }

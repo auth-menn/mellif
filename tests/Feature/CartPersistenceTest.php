@@ -2,6 +2,7 @@
 
 use App\Models\CartItem;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
@@ -15,6 +16,35 @@ function createCartVariant(int $stock = 5): ProductVariant
     ]);
 
     return ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'M', 'stock' => $stock]);
+}
+
+function createCartHistoryOrder(User $user, ProductVariant $variant, string $orderNumber, string $paymentStatus): Order
+{
+    $order = Order::query()->create([
+        'user_id' => $user->id,
+        'order_number' => $orderNumber,
+        'recipient_name' => 'Test buyer',
+        'phone' => '08123456789',
+        'address' => 'Jakarta',
+        'shipping_courier' => 'JNE',
+        'shipping_cost' => 0,
+        'payment_method' => 'QRIS',
+        'payment_method_code' => 'qris',
+        'subtotal' => 100000,
+        'total' => 100000,
+        'status' => $paymentStatus === 'paid' ? 'processing' : 'pending_payment',
+        'qris_payment_status' => $paymentStatus,
+    ]);
+    $order->items()->create([
+        'product_id' => $variant->product_id,
+        'variant_id' => $variant->id,
+        'product_name' => $variant->product->name,
+        'size' => $variant->size,
+        'qty' => 1,
+        'unit_price' => 100000,
+    ]);
+
+    return $order;
 }
 
 it('stores and updates authenticated cart items while validating current stock', function () {
@@ -58,6 +88,24 @@ it('merges guest items into the account cart and caps quantities to available st
 
 it('requires authentication for server cart access', function () {
     $this->getJson(route('cart.index'))->assertUnauthorized();
+});
+
+it('shows this user their unpaid orders and paid product history in the cart', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $variant = createCartVariant();
+    createCartHistoryOrder($user, $variant, 'MLF-CART-UNPAID', 'unpaid');
+    createCartHistoryOrder($user, $variant, 'MLF-CART-PAID', 'paid');
+    createCartHistoryOrder($otherUser, $variant, 'MLF-CART-OTHER', 'paid');
+
+    $this->actingAs($user)->getJson(route('cart.index'))
+        ->assertOk()
+        ->assertJsonCount(1, 'orders.awaitingPayment')
+        ->assertJsonPath('orders.awaitingPayment.0.orderNumber', 'MLF-CART-UNPAID')
+        ->assertJsonPath('orders.awaitingPayment.0.items.0.productName', 'Everyday Tee')
+        ->assertJsonCount(1, 'orders.paid')
+        ->assertJsonPath('orders.paid.0.orderNumber', 'MLF-CART-PAID')
+        ->assertJsonPath('orders.paid.0.items.0.size', 'M');
 });
 
 it('rejects non-canonical cart quantities with a 422 response', function (mixed $quantity) {

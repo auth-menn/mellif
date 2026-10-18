@@ -7,7 +7,33 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShippingCourier;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+
+/** @return array{owner: User, order: Order} */
+function makeCheckoutQrisOrder(string $orderNumber, array $attributes = []): array
+{
+    $owner = User::factory()->create();
+    $order = Order::query()->create(array_merge([
+        'user_id' => $owner->id,
+        'order_number' => $orderNumber,
+        'recipient_name' => 'Test Buyer',
+        'phone' => '08123456789',
+        'address' => 'Jakarta',
+        'shipping_courier' => 'JNE',
+        'shipping_cost' => 0,
+        'payment_method' => 'QRIS',
+        'payment_method_code' => 'qris',
+        'subtotal' => 100000,
+        'total' => 100000,
+        'status' => 'pending_payment',
+        'qrisly_history_id' => 8759,
+        'qris_payment_status' => 'expired',
+        'qris_expiry_time' => now()->subMinute(),
+    ], $attributes));
+
+    return compact('owner', 'order');
+}
 
 it('confirms QRIS payment status only for the order owner', function () {
     Http::preventStrayRequests();
@@ -17,7 +43,10 @@ it('confirms QRIS payment status only for the order owner', function () {
             'data' => ['history_id' => 8759, 'payment_status' => 'paid', 'amount' => 318001],
         ]),
     ]);
-    config(['services.qrisly.key' => 'test-qrisly-key']);
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
     $owner = User::factory()->create();
     $otherUser = User::factory()->create();
     $order = Order::query()->create([
@@ -54,6 +83,10 @@ it('confirms QRIS payment status only for the order owner', function () {
 it('generates a replacement QRIS for an expired order', function () {
     Http::preventStrayRequests();
     Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['history_id' => 8759, 'payment_status' => 'expired'],
+        ]),
         'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
             'meta' => ['status' => 'success', 'code' => 200],
             'data' => [
@@ -66,7 +99,11 @@ it('generates a replacement QRIS for an expired order', function () {
             ],
         ]),
     ]);
-    config(['services.qrisly.key' => 'test-qrisly-key', 'services.qrisly.qris_id' => 123]);
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
     $owner = User::factory()->create();
     $order = Order::query()->create([
         'user_id' => $owner->id,
@@ -86,7 +123,7 @@ it('generates a replacement QRIS for an expired order', function () {
     ]);
 
     $this->actingAs($owner)->post(route('checkout.orders.qris.regenerate', $order))
-        ->assertRedirect(route('checkout.show', ['order' => $order->order_number]));
+        ->assertRedirect(route('checkout.show'));
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->id,
@@ -100,6 +137,10 @@ it('generates a replacement QRIS for an expired order', function () {
 it('does not store the provider placeholder as a QRIS payment code', function () {
     Http::preventStrayRequests();
     Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['history_id' => 8759, 'payment_status' => 'expired'],
+        ]),
         'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
             'meta' => ['status' => 'success', 'code' => 200],
             'data' => [
@@ -112,7 +153,11 @@ it('does not store the provider placeholder as a QRIS payment code', function ()
             ],
         ]),
     ]);
-    config(['services.qrisly.key' => 'test-qrisly-key', 'services.qrisly.qris_id' => 123]);
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
     $owner = User::factory()->create();
     $order = Order::query()->create([
         'user_id' => $owner->id,
@@ -131,7 +176,7 @@ it('does not store the provider placeholder as a QRIS payment code', function ()
     ]);
 
     $this->actingAs($owner)->post(route('checkout.orders.qris.regenerate', $order))
-        ->assertRedirect(route('checkout.show', ['order' => $order->order_number]));
+        ->assertRedirect(route('checkout.show'));
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->id,
@@ -182,4 +227,131 @@ it('rejects QRIS orders below the provider minimum before reserving stock', func
 
     $this->assertDatabaseCount('orders', 0);
     expect($variant->fresh()->stock)->toBe(1);
+});
+
+it('denies another user access to QRIS cancellation and regeneration', function () {
+    Http::preventStrayRequests();
+    config(['inertia.ssr.enabled' => false]);
+    $context = makeCheckoutQrisOrder('MLF-QRIS-OWNER-ONLY');
+    $otherUser = User::factory()->create();
+
+    $this->actingAs($otherUser)->post(route('checkout.orders.qris.cancel', $context['order']))->assertNotFound();
+    $this->actingAs($otherUser)->post(route('checkout.orders.qris.regenerate', $context['order']))->assertNotFound();
+});
+
+it('returns the existing active QR instead of creating another one', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-ACTIVE', [
+        'qris_payment_status' => 'unpaid',
+        'qris_expiry_time' => now()->addMinutes(10),
+    ]);
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['history_id' => 8759, 'payment_status' => 'unpaid'],
+        ]),
+    ]);
+
+    $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
+        ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
+
+    Http::assertSentCount(1);
+    $this->assertDatabaseHas('orders', ['id' => $context['order']->id, 'qris_regeneration_count' => 0]);
+});
+
+it('limits QRIS regeneration to three attempts per order', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-REGEN-LIMIT');
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    $generatedHistoryId = 8760;
+    $generatedCount = 0;
+    Http::fake(function ($request) use (&$generatedHistoryId, &$generatedCount) {
+        if (preg_match('~/payment-status/[0-9]+$~', $request->url()) === 1) {
+            return Http::response([
+                'meta' => ['status' => 'success', 'code' => 200],
+                'data' => ['payment_status' => 'expired'],
+            ]);
+        }
+
+        if (str_ends_with($request->url(), '/generate-qris')) {
+            $generatedCount++;
+
+            return Http::response([
+                'meta' => ['status' => 'success', 'code' => 200],
+                'data' => [
+                    'history_id' => $generatedHistoryId++,
+                    'qris_string' => 'VALID_QRIS_PAYLOAD',
+                    'original_amount' => 100000,
+                    'final_amount' => 100001,
+                    'payment_status' => 'unpaid',
+                    'expiry_time' => now()->addMinutes(10)->toDateTimeString(),
+                ],
+            ]);
+        }
+
+        return Http::response([], 404);
+    });
+
+    for ($attempt = 0; $attempt < 3; $attempt++) {
+        $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
+            ->assertRedirect(route('checkout.show'));
+    }
+
+    $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
+        ->assertStatus(429);
+
+    expect($generatedCount)->toBe(3);
+    $this->assertDatabaseHas('orders', [
+        'id' => $context['order']->id,
+        'qris_regeneration_count' => 3,
+        'qrisly_history_id' => 8762,
+    ]);
+});
+
+it('rejects a concurrent QRIS regeneration while the order lock is held', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-REGEN-LOCK');
+    $lock = Cache::lock('qrisly:regenerate:'.$context['order']->id, 45);
+    expect($lock->get())->toBeTrue();
+
+    try {
+        $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
+            ->assertStatus(409);
+    } finally {
+        $lock->release();
+    }
+});
+
+it('caches repeated payment status polls briefly', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-POLL-CACHE', [
+        'qris_payment_status' => 'unpaid',
+        'qris_expiry_time' => now()->addMinutes(10),
+    ]);
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['history_id' => 8759, 'payment_status' => 'unpaid'],
+        ]),
+    ]);
+
+    foreach (range(1, 2) as $_) {
+        $this->actingAs($context['owner'])->getJson(route('checkout.orders.qris-status', $context['order']))
+            ->assertOk()
+            ->assertExactJson(['payment_status' => 'unpaid']);
+    }
+
+    Http::assertSentCount(1);
 });

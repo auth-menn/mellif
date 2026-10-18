@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
                 ? response()->json(['message' => 'Terlalu banyak percobaan checkout. Coba lagi sebentar.'], 429, $headers)
                 : back()->withErrors(['items' => 'Terlalu banyak percobaan checkout. Coba lagi sebentar.']),
         ));
+        RateLimiter::for('qrisly-webhook', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
     }
 
     /**

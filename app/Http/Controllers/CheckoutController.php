@@ -3,25 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PlaceOrderRequest;
+use App\Mail\OrderPlaced;
 use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentMethod;
-use App\Models\ProductVariant;
 use App\Models\ShippingCourier;
 use App\Services\CheckoutItemsService;
 use App\Services\QrislyService;
+use App\Services\QrisPaymentSettlement;
 use App\Services\ShippingRateException;
 use App\Services\ShippingRateService;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -34,18 +38,36 @@ class CheckoutController extends Controller
     {
         $orderNumber = $request->query('order', $request->session()->pull('order_number'));
         $order = $request->user() && is_string($orderNumber)
-            ? Order::query()->whereBelongsTo($request->user())->where('order_number', $orderNumber)->first()
+            ? Order::query()->with('items.product.images')->whereBelongsTo($request->user())->where('order_number', $orderNumber)->first()
             : null;
 
         return Inertia::render('store/checkout', [
-            'paymentMethods' => PaymentMethod::query()->where('is_active', true)->get(['id', 'name', 'code']),
+            'paymentMethods' => PaymentMethod::query()
+                ->where('is_active', true)
+                ->where('code', 'qris')
+                ->get(['id', 'name', 'code']),
             'order' => $order ? [
                 'id' => $order->id,
                 'orderNumber' => $order->order_number,
                 'status' => $order->status,
                 'total' => $order->total,
+                'subtotal' => $order->subtotal,
+                'shippingCost' => $order->shipping_cost,
+                'shippingCourier' => $order->shipping_courier,
+                'shippingService' => $order->shipping_service,
+                'items' => $order->items->map(function (OrderItem $item): array {
+                    $imagePath = $item->product?->images->first()?->path;
+
+                    return [
+                        'name' => $item->product_name,
+                        'size' => $item->size,
+                        'quantity' => $item->qty,
+                        'unitPrice' => $item->unit_price,
+                        'imageUrl' => $imagePath ? asset('storage/'.$imagePath) : null,
+                    ];
+                })->all(),
                 'paymentMethodCode' => $order->payment_method_code,
-                'qrisString' => $order->qris_string,
+                'hasQris' => $order->qrisly_history_id !== null,
                 'qrisImage' => $order->qris_string && $order->qris_payment_status === 'unpaid'
                     ? 'data:image/svg+xml;base64,'.base64_encode((new Writer(new ImageRenderer(new RendererStyle(280, 4), new SvgImageBackEnd)))->writeString($order->qris_string))
                     : null,
@@ -61,32 +83,46 @@ class CheckoutController extends Controller
         $data = $request->validated();
         $items = collect($data['items']);
         ['variants' => $rateVariants, 'quantities' => $quantitiesByVariant] = $checkoutItems->resolve($data['items']);
-        $courierCodes = ShippingCourier::activeCodes();
-        if ($courierCodes === []) {
-            throw ValidationException::withMessages(['courier_code' => 'Ekspedisi belum tersedia. Silakan hubungi kami.']);
-        }
-        try {
-            $rate = $shippingRates->findRate(
-                (int) $data['destination_id'],
-                $shippingRates->weightFor($rateVariants, $quantitiesByVariant),
-                $courierCodes,
-                $data['courier_code'],
-                $data['courier_service'],
-            );
-        } catch (ShippingRateException $exception) {
-            throw ValidationException::withMessages(['destination_id' => $exception->getMessage()]);
-        }
-        if (! $rate) {
-            throw ValidationException::withMessages(['courier_service' => 'Layanan ongkir ini sudah tidak tersedia. Pilih layanan lain.']);
-        }
-        if ((int) $data['expected_shipping_cost'] !== $rate['cost']) {
-            throw ValidationException::withMessages(['courier_service' => 'Ongkir berubah, silakan periksa total.']);
+        $isDirectCod = $data['delivery_method'] === 'direct_cod';
+        $rate = [
+            'name' => 'COD',
+            'code' => null,
+            'service' => null,
+            'etd' => null,
+            'cost' => 0,
+        ];
+        $destinationLabel = $isDirectCod ? 'COD' : null;
+
+        if (! $isDirectCod) {
+            $courierCodes = ShippingCourier::activeCodes();
+            if ($courierCodes === []) {
+                throw ValidationException::withMessages(['courier_code' => 'Ekspedisi belum tersedia. Silakan hubungi kami.']);
+            }
+
+            try {
+                $shippingRate = $shippingRates->findRate(
+                    (int) $data['destination_id'],
+                    $shippingRates->weightFor($rateVariants, $quantitiesByVariant),
+                    $courierCodes,
+                    $data['courier_code'],
+                    $data['courier_service'],
+                );
+            } catch (ShippingRateException $exception) {
+                throw ValidationException::withMessages(['destination_id' => $exception->getMessage()]);
+            }
+            if (! $shippingRate) {
+                throw ValidationException::withMessages(['courier_service' => 'Layanan ongkir ini sudah tidak tersedia. Pilih layanan lain.']);
+            }
+            if ((int) $data['expected_shipping_cost'] !== $shippingRate['cost']) {
+                throw ValidationException::withMessages(['courier_service' => 'Ongkir berubah, silakan periksa total.']);
+            }
+
+            $rate = $shippingRate;
+            $destinationLabel = $shippingRates->destinationLabel((int) $data['destination_id'])
+                ?? mb_substr(trim(strip_tags($data['destination_label'])), 0, 255);
         }
 
-        $destinationLabel = $shippingRates->destinationLabel((int) $data['destination_id'])
-            ?? mb_substr(trim(strip_tags($data['destination_label'])), 0, 255);
-
-        $order = DB::transaction(function () use ($data, $request, $items, $quantitiesByVariant, $rate, $destinationLabel, $checkoutItems): Order {
+        $order = DB::transaction(function () use ($data, $request, $items, $quantitiesByVariant, $rate, $destinationLabel, $checkoutItems, $isDirectCod): Order {
             $paymentMethod = PaymentMethod::query()->whereKey($data['payment_method_id'])->where('is_active', true)->firstOrFail();
             ['variants' => $variants] = $checkoutItems->resolve($data['items'], true);
 
@@ -109,7 +145,7 @@ class CheckoutController extends Controller
                 'address' => $data['address'], 'address_detail' => $data['address_detail'] ?? null,
                 'shipping_courier' => $rate['name'], 'shipping_courier_code' => $rate['code'],
                 'shipping_service' => $rate['service'], 'shipping_etd' => $rate['etd'],
-                'destination_id' => $data['destination_id'], 'destination_label' => $destinationLabel,
+                'destination_id' => $isDirectCod ? null : $data['destination_id'], 'destination_label' => $destinationLabel,
                 'shipping_cost' => $rate['cost'],
                 'payment_method' => $paymentMethod->name, 'payment_method_code' => $paymentMethod->code, 'subtotal' => $subtotal,
                 'total' => $total, 'status' => 'pending_payment',
@@ -148,44 +184,63 @@ class CheckoutController extends Controller
         if ($order->payment_method_code === 'qris') {
             try {
                 $qris = $qrisly->generate($order);
-                $order->update([
-                    'qrisly_history_id' => $qris['history_id'],
-                    'qris_string' => $qris['qris_string'],
-                    'qris_original_amount' => $qris['original_amount'],
-                    'qris_final_amount' => $qris['final_amount'],
-                    'qris_payment_status' => $qris['payment_status'],
-                    'qris_expiry_time' => $qris['expiry_time'],
-                ]);
+                $this->storeGeneratedQris($order, $qris);
             } catch (Throwable $exception) {
                 Log::warning('QRISLY QRIS generation failed.', [
+                    'event' => 'payment.generation',
                     'order_id' => $order->id,
-                    'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
+                    'history_id' => $order->qrisly_history_id,
+                    'decision' => 'generation_failed:'.$exception::class,
                 ]);
-                $order->update(['qris_payment_status' => 'failed']);
+                $this->markQrisGenerationFailed($order);
             }
         }
+
+        $this->queueOrderNotifications($order->load(['user', 'items']));
 
         return redirect()->route('checkout.show')->with('order_number', $order->order_number);
     }
 
-    public function paymentStatus(Request $request, Order $order, QrislyService $qrisly): JsonResponse
+    private function queueOrderNotifications(Order $order): void
+    {
+        $recipients = [
+            [config('mail.order_notification_email'), true],
+            [$order->user->email, false],
+        ];
+
+        foreach ($recipients as [$email, $forAdmin]) {
+            try {
+                Mail::to($email)->queue(new OrderPlaced($order, $forAdmin));
+            } catch (Throwable $exception) {
+                Log::warning('Order email notification could not be queued.', [
+                    'order_id' => $order->id,
+                    'recipient_type' => $forAdmin ? 'admin' : 'customer',
+                    'exception' => $exception::class,
+                ]);
+            }
+        }
+    }
+
+    public function paymentStatus(Request $request, Order $order, QrislyService $qrisly, QrisPaymentSettlement $settlement): JsonResponse
     {
         abort_unless($request->user()?->is($order->user), 404);
         abort_if($order->payment_method_code !== 'qris' || ! $order->qrisly_history_id, 404);
 
         try {
-            $status = $qrisly->paymentStatus((int) $order->qrisly_history_id);
+            $status = Cache::remember(QrisPaymentSettlement::statusCacheKey($order), now()->addSeconds(7), function () use ($qrisly, $settlement, $order): string {
+                $status = $qrisly->paymentStatus((int) $order->qrisly_history_id);
+                $settlement->synchronize($order, $status, 'payment.polling');
+
+                return $status;
+            });
         } catch (Throwable) {
             return response()->json(['message' => 'Status pembayaran belum dapat diperbarui.'], 503);
         }
 
-        $order = $this->syncQrisPaymentStatus($order, $status);
-
         return response()->json(['payment_status' => $status]);
     }
 
-    public function cancelQrisPayment(Request $request, Order $order, QrislyService $qrisly): RedirectResponse
+    public function cancelQrisPayment(Request $request, Order $order, QrislyService $qrisly, QrisPaymentSettlement $settlement): RedirectResponse
     {
         abort_unless($request->user()?->is($order->user), 404);
         abort_unless($order->payment_method_code === 'qris', 404);
@@ -198,76 +253,121 @@ class CheckoutController extends Controller
                 Log::warning('QRIS payment status could not be verified before cancellation.', [
                     'order_id' => $order->id,
                     'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
                 ]);
 
                 abort(503, 'Status pembayaran belum dapat dipastikan. Coba batalkan kembali sebentar lagi.');
             }
 
             if ($providerStatus === 'paid') {
-                $this->syncQrisPaymentStatus($order, $providerStatus);
+                $settlement->synchronize($order, $providerStatus, 'payment.cancel_check');
 
                 return redirect()->route('checkout.show', ['order' => $order->order_number]);
             }
         }
 
-        DB::transaction(function () use ($order): void {
-            $lockedOrder = Order::query()->with('items')->lockForUpdate()->findOrFail($order->id);
-            abort_unless($lockedOrder->status === 'pending_payment', 409);
-            abort_unless($lockedOrder->qris_payment_status !== 'paid', 409);
-
-            if ($lockedOrder->stock_deducted) {
-                $this->restoreOrderStock($lockedOrder);
-            }
-
-            $lockedOrder->update([
-                'status' => 'cancelled',
-                'qris_payment_status' => 'cancelled',
-                'stock_deducted' => false,
-            ]);
-        });
+        $settlement->cancelPendingOrder($order);
 
         return redirect()->route('checkout.show');
     }
 
-    public function regenerateQris(Request $request, Order $order, QrislyService $qrisly): RedirectResponse
+    public function regenerateQris(Request $request, Order $order, QrislyService $qrisly, QrisPaymentSettlement $settlement): RedirectResponse
     {
         abort_unless($request->user()?->is($order->user), 404);
         abort_unless($order->payment_method_code === 'qris', 404);
-        abort_unless($order->status === 'pending_payment', 409);
-
-        $isExpiredByTime = $order->qris_expiry_time?->isPast() ?? false;
-        $canRegenerate = in_array($order->qris_payment_status, ['failed', 'expired', 'cancelled'], true)
-            || ($order->qris_payment_status === 'unpaid' && $isExpiredByTime);
-        abort_unless($canRegenerate, 409);
-
-        if ($order->qrisly_history_id) {
-            try {
-                $providerStatus = $qrisly->paymentStatus((int) $order->qrisly_history_id);
-            } catch (Throwable $exception) {
-                Log::warning('QRIS payment status could not be verified before regeneration.', [
-                    'order_id' => $order->id,
-                    'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
-                ]);
-
-                abort(503, 'Status pembayaran belum dapat dipastikan. Coba generate QRIS kembali sebentar lagi.');
-            }
-
-            if ($providerStatus === 'paid') {
-                $this->syncQrisPaymentStatus($order, $providerStatus);
-
-                return redirect()->route('checkout.show', ['order' => $order->order_number]);
-            }
-
-            if ($order->qris_payment_status === 'unpaid' && ! $isExpiredByTime && $providerStatus === 'unpaid') {
-                abort(409);
-            }
-        }
 
         try {
-            $qris = $qrisly->generate($order);
-            $order->update([
+            return Cache::lock('qrisly:regenerate:'.$order->id, 45)->block(3, function () use ($order, $qrisly, $settlement): RedirectResponse {
+                $currentOrder = Order::query()->findOrFail($order->id);
+                abort_unless($currentOrder->payment_method_code === 'qris', 404);
+                abort_unless($currentOrder->status === 'pending_payment', 409);
+
+                $isExpiredByTime = $currentOrder->qris_expiry_time?->isPast() ?? false;
+                $canRegenerate = in_array($currentOrder->qris_payment_status, ['failed', 'expired', 'cancelled'], true)
+                    || ($currentOrder->qris_payment_status === 'unpaid' && $isExpiredByTime);
+                $hasActiveQr = $currentOrder->qris_payment_status === 'unpaid'
+                    && ! $isExpiredByTime
+                    && $currentOrder->qrisly_history_id !== null;
+                abort_unless($canRegenerate || $hasActiveQr, 409);
+
+                if ($currentOrder->qrisly_history_id) {
+                    try {
+                        $providerStatus = $qrisly->paymentStatus((int) $currentOrder->qrisly_history_id);
+                    } catch (Throwable) {
+                        Log::warning('QRIS payment status could not be verified before regeneration.', [
+                            'event' => 'payment.regeneration_check',
+                            'order_id' => $currentOrder->id,
+                            'history_id' => $currentOrder->qrisly_history_id,
+                            'decision' => 'retry_later',
+                        ]);
+
+                        abort(503, 'Status pembayaran belum dapat dipastikan. Coba generate QRIS kembali sebentar lagi.');
+                    }
+
+                    if ($providerStatus === 'paid') {
+                        $settlement->synchronize($currentOrder, $providerStatus, 'payment.regeneration_check');
+
+                        return redirect()->route('checkout.show', ['order' => $currentOrder->order_number]);
+                    }
+
+                    if ($providerStatus === 'unpaid' && ! $isExpiredByTime) {
+                        return redirect()->route('checkout.show', ['order' => $currentOrder->order_number]);
+                    }
+
+                    if (! $canRegenerate && ! in_array($providerStatus, ['expired', 'cancelled'], true)) {
+                        abort(409);
+                    }
+                }
+
+                $shouldGenerate = DB::transaction(function () use ($currentOrder): bool {
+                    $lockedOrder = Order::query()->lockForUpdate()->findOrFail($currentOrder->id);
+                    abort_unless($lockedOrder->status === 'pending_payment', 409);
+
+                    if ($lockedOrder->qris_payment_status === 'paid') {
+                        return false;
+                    }
+
+                    abort_unless($lockedOrder->qris_regeneration_count < 3, 429);
+                    $lockedOrder->increment('qris_regeneration_count');
+
+                    return true;
+                });
+
+                if (! $shouldGenerate) {
+                    return redirect()->route('checkout.show', ['order' => $currentOrder->order_number]);
+                }
+
+                try {
+                    $qris = $qrisly->generate($currentOrder);
+                    $this->storeGeneratedQris($currentOrder, $qris);
+                } catch (Throwable $exception) {
+                    Log::warning('QRISLY QRIS regeneration failed.', [
+                        'event' => 'payment.regeneration',
+                        'order_id' => $currentOrder->id,
+                        'history_id' => $currentOrder->qrisly_history_id,
+                        'decision' => 'generation_failed:'.$exception::class,
+                    ]);
+                    $this->markQrisGenerationFailed($currentOrder);
+                }
+
+                Cache::forget(QrisPaymentSettlement::statusCacheKey($currentOrder));
+
+                return redirect()->route('checkout.show')->with('order_number', $currentOrder->order_number);
+            });
+        } catch (LockTimeoutException) {
+            abort(409, 'Permintaan QRIS sedang diproses. Coba kembali sebentar lagi.');
+        }
+    }
+
+    /** @param array{history_id: int, qris_string: string, original_amount: int, final_amount: int, payment_status: string, expiry_time: string} $qris */
+    private function storeGeneratedQris(Order $order, array $qris): void
+    {
+        DB::transaction(function () use ($order, $qris): void {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            if ($lockedOrder->qris_payment_status === 'paid') {
+                return;
+            }
+
+            $lockedOrder->update([
                 'qrisly_history_id' => $qris['history_id'],
                 'qris_string' => $qris['qris_string'],
                 'qris_original_amount' => $qris['original_amount'],
@@ -275,101 +375,16 @@ class CheckoutController extends Controller
                 'qris_payment_status' => $qris['payment_status'],
                 'qris_expiry_time' => $qris['expiry_time'],
             ]);
-        } catch (Throwable $exception) {
-            Log::warning('QRISLY QRIS regeneration failed.', [
-                'order_id' => $order->id,
-                'exception' => $exception::class,
-                'message' => $exception->getMessage(),
-            ]);
-            $order->update(['qris_payment_status' => 'failed']);
-        }
-
-        return redirect()->route('checkout.show')->with('order_number', $order->order_number);
-    }
-
-    private function syncQrisPaymentStatus(Order $order, string $status): Order
-    {
-        return DB::transaction(function () use ($order, $status): Order {
-            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-
-            if (in_array($lockedOrder->status, ['cancelled', 'rejected'], true)) {
-                if ($status === 'paid') {
-                    $lockedOrder->update(['qris_payment_status' => 'paid']);
-                    Log::warning('QRIS payment was received after the order was cancelled.', [
-                        'order_id' => $lockedOrder->id,
-                        'order_number' => $lockedOrder->order_number,
-                    ]);
-                }
-
-                return $lockedOrder;
-            }
-
-            $updates = ['qris_payment_status' => $status];
-            if ($status === 'paid' && $lockedOrder->status === 'pending_payment') {
-                if (! $lockedOrder->stock_deducted) {
-                    $lockedOrder->load('items');
-                    $quantitiesByVariant = $lockedOrder->items
-                        ->whereNotNull('variant_id')
-                        ->groupBy('variant_id')
-                        ->map(fn ($items): int => $items->sum('qty'));
-                    $variants = ProductVariant::query()
-                        ->whereIn('id', $quantitiesByVariant->keys())
-                        ->orderBy('id')
-                        ->lockForUpdate()
-                        ->get()
-                        ->keyBy('id');
-                    $hasAvailableStock = $variants->count() === $quantitiesByVariant->count();
-
-                    foreach ($quantitiesByVariant as $variantId => $quantity) {
-                        if (($variants->get((int) $variantId)?->stock ?? 0) < $quantity) {
-                            $hasAvailableStock = false;
-                            break;
-                        }
-                    }
-
-                    if ($hasAvailableStock) {
-                        foreach ($quantitiesByVariant as $variantId => $quantity) {
-                            $variants->get((int) $variantId)->decrement('stock', $quantity);
-                        }
-                        $updates['stock_deducted'] = true;
-                        $updates['status'] = 'processing';
-                    } else {
-                        $updates['status'] = 'paid';
-                        Log::warning('Paid QRIS order has insufficient stock for automatic processing.', [
-                            'order_id' => $lockedOrder->id,
-                            'order_number' => $lockedOrder->order_number,
-                        ]);
-                    }
-
-                    CartItem::query()->where('user_id', $lockedOrder->user_id)
-                        ->whereIn('product_variant_id', $quantitiesByVariant->keys())
-                        ->delete();
-                } else {
-                    $updates['status'] = 'processing';
-                }
-            }
-
-            $lockedOrder->update($updates);
-
-            return $lockedOrder;
         });
     }
 
-    private function restoreOrderStock(Order $order): void
+    private function markQrisGenerationFailed(Order $order): void
     {
-        $quantitiesByVariant = $order->items
-            ->whereNotNull('variant_id')
-            ->groupBy('variant_id')
-            ->map(fn ($items): int => $items->sum('qty'));
-        $variants = ProductVariant::query()
-            ->whereIn('id', $quantitiesByVariant->keys())
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get()
-            ->keyBy('id');
-
-        foreach ($quantitiesByVariant as $variantId => $quantity) {
-            $variants->get((int) $variantId)?->increment('stock', $quantity);
-        }
+        DB::transaction(function () use ($order): void {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            if ($lockedOrder->qris_payment_status !== 'paid') {
+                $lockedOrder->update(['qris_payment_status' => 'failed']);
+            }
+        });
     }
 }

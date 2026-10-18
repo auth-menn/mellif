@@ -1,11 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import { index as shopIndex, show as shopShow } from '@/routes/shop';
 
 type HomeSlide = {
     id: number;
     imageUrl: string;
+    width?: number | null;
+    height?: number | null;
     alt: string;
     productUrl?: string | null;
 };
@@ -19,14 +21,17 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
     const dragState = useRef<number | null>(null);
     const suppressSlideClick = useRef(false);
     const pendingDirection = useRef<-1 | 1 | null>(null);
+    const slides = productSlides;
+    const firstSlide = slides[0];
     const [activeSlide, setActiveSlide] = useState(0);
     const [carouselVisible, setCarouselVisible] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
-    const [carouselAspectRatio, setCarouselAspectRatio] = useState(1);
+    const [carouselAspectRatio, setCarouselAspectRatio] = useState(() => firstSlide?.width && firstSlide.height ? firstSlide.width / firstSlide.height : 1);
     const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
     const [heroVisible, setHeroVisible] = useState(false);
-    const slides = productSlides;
+    const activeSlideImage = slides[activeSlide];
+    const activeSlideImageUrl = activeSlideImage?.imageUrl;
     const activeHeroVideo = heroVideos[activeHeroVideoIndex] ?? heroVideos[0];
 
     const completeTransition = useCallback((): void => {
@@ -107,6 +112,40 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
             window.cancelAnimationFrame(animationFrame);
         };
     }, []);
+
+    useLayoutEffect(() => {
+        if (activeSlideImage?.width && activeSlideImage.height) {
+            const nextAspectRatio = activeSlideImage.width / activeSlideImage.height;
+            setCarouselAspectRatio((currentAspectRatio) => currentAspectRatio === nextAspectRatio ? currentAspectRatio : nextAspectRatio);
+
+            return;
+        }
+
+        const image = carouselFrameRef.current?.querySelector<HTMLImageElement>('img[aria-hidden="false"]');
+
+        if (!image) {
+            return;
+        }
+
+        const updateAspectRatio = (): void => {
+            if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+                return;
+            }
+
+            const nextAspectRatio = image.naturalWidth / image.naturalHeight;
+            setCarouselAspectRatio((currentAspectRatio) => currentAspectRatio === nextAspectRatio ? currentAspectRatio : nextAspectRatio);
+        };
+
+        if (image.complete) {
+            updateAspectRatio();
+
+            return;
+        }
+
+        image.addEventListener('load', updateAspectRatio, { once: true });
+
+        return () => image.removeEventListener('load', updateAspectRatio);
+    }, [activeSlideImage?.height, activeSlideImage?.width, activeSlideImageUrl]);
 
     useEffect(() => {
         const heroFrame = heroFrameRef.current;
@@ -198,7 +237,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                                 loop={heroVideos.length === 1}
                                 playsInline
                                 preload="metadata"
-                                poster={heroImageUrl ?? undefined}
+                                poster={heroImageUrl ?? slides[0]?.imageUrl}
                                 src={activeHeroVideo}
                                 onEnded={() => setActiveHeroVideoIndex((index) => (index + 1) % heroVideos.length)}
                                 className="h-full w-full object-cover"
@@ -321,11 +360,6 @@ export default function Home({ heroImageUrl, heroVideos, productSlides }: { hero
                                         aria-hidden={relativeIndex !== 0}
                                         fetchPriority={relativeIndex === 0 ? 'high' : 'low'}
                                         decoding="async"
-                                        onLoad={(event) => {
-                                            if (relativeIndex === 0) {
-                                                setCarouselAspectRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight);
-                                            }
-                                        }}
                                         className="home-carousel-image pointer-events-none h-full w-full select-none object-contain"
                                     />
                                 </div>

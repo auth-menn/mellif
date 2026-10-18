@@ -24,6 +24,26 @@ class DashboardController extends Controller
             'recentOrders' => Order::query()->with('user:id,name')->latest()->limit(5)->get([
                 'id', 'user_id', 'order_number', 'total', 'status', 'created_at',
             ]),
+            'manualReviewOrders' => Order::query()
+                ->with('user:id,name')
+                ->where('qris_payment_status', 'paid')
+                ->where(function ($query): void {
+                    $query->whereIn('status', ['cancelled', 'rejected'])
+                        ->orWhere(function ($query): void {
+                            $query->where('status', 'paid')->where('stock_deducted', false);
+                        });
+                })
+                ->latest()
+                ->limit(20)
+                ->get(['id', 'user_id', 'order_number', 'total', 'status', 'stock_deducted', 'created_at'])
+                ->map(fn (Order $order): array => [
+                    'id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'total' => $order->total,
+                    'created_at' => $order->created_at,
+                    'customer' => $order->user?->name,
+                    'reason' => in_array($order->status, ['cancelled', 'rejected'], true) ? 'paid_after_cancellation' : 'insufficient_stock',
+                ]),
         ]);
     }
 }

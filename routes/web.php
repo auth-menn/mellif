@@ -13,11 +13,29 @@ use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\StorefrontController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
+use Laravel\Fortify\Http\Controllers\EmailVerificationPromptController;
+use Laravel\Fortify\Http\Controllers\NewPasswordController;
+use Laravel\Fortify\Http\Controllers\PasswordResetLinkController;
 
 Route::get('/', [StorefrontController::class, 'home'])->name('home');
 Route::get('/about', [StorefrontController::class, 'about'])->name('about');
 Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
 Route::get('/shop/{product:slug}', [StorefrontController::class, 'product'])->name('shop.show');
+Route::get('/login', fn () => abort(404));
+Route::get('/register', fn () => abort(404));
+Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
+    ->middleware('guest')
+    ->name('password.request');
+Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
+    ->middleware('guest')
+    ->name('password.reset');
+Route::get('/email/verify', EmailVerificationPromptController::class)
+    ->middleware('auth')
+    ->name('verification.notice');
+Route::get('/user/confirm-password', [ConfirmablePasswordController::class, 'show'])
+    ->middleware('auth')
+    ->name('password.confirm');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware(['auth', 'throttle:checkout'])->name('checkout.store');
 Route::middleware(['auth', 'throttle:10,1'])->prefix('checkout/orders/{order}')->name('checkout.orders.')->group(function () {

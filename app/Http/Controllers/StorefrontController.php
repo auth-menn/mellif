@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use App\Models\StoreSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,6 +25,7 @@ class StorefrontController extends Controller
             ->map(fn (array $image, int $index): array => [
                 'id' => $index + 1,
                 'imageUrl' => asset('storage/'.$image['path']),
+                ...$this->imageDimensions($image['path']),
                 'alt' => '',
                 'productUrl' => $image['product_id'] ? $linkedProductSlugs->get($image['product_id']) : null,
             ])
@@ -58,6 +60,18 @@ class StorefrontController extends Controller
             : (is_array($image) && is_string($image['path'] ?? null)
                 ? ['path' => $image['path'], 'product_id' => isset($image['product_id']) ? (int) $image['product_id'] : null]
                 : null), $stored)));
+    }
+
+    /** @return array{width: int|null, height: int|null} */
+    private function imageDimensions(string $path): array
+    {
+        $filePath = Storage::disk('public')->path($path);
+        $dimensions = is_file($filePath) ? @getimagesize($filePath) : false;
+
+        return [
+            'width' => is_array($dimensions) ? $dimensions[0] : null,
+            'height' => is_array($dimensions) ? $dimensions[1] : null,
+        ];
     }
 
     public function about(): Response
