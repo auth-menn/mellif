@@ -160,7 +160,7 @@ describe('checkout stock consistency', function () {
                     'history_id' => 12345,
                     'qris_string' => '0002010102112661006299VALID_QRIS540410016304E8E2',
                     'original_amount' => 100000,
-                    'final_amount' => 100001,
+                    'final_amount' => 100000,
                     'payment_status' => 'unpaid',
                     'expiry_time' => '2026-10-18 12:00:00',
                 ],
@@ -195,7 +195,7 @@ describe('checkout stock consistency', function () {
             'stock_deducted' => false,
             'qrisly_history_id' => 12345,
             'qris_original_amount' => 100000,
-            'qris_final_amount' => 100001,
+            'qris_final_amount' => 100000,
             'qris_payment_status' => 'unpaid',
         ]);
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'calculate/domestic-cost'));

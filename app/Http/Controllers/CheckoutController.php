@@ -19,6 +19,8 @@ use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -191,6 +193,7 @@ class CheckoutController extends Controller
                     'order_id' => $order->id,
                     'history_id' => $order->qrisly_history_id,
                     'decision' => 'generation_failed:'.$exception::class,
+                    'failure_reason' => $this->qrisGenerationFailureReason($exception),
                 ]);
                 $this->markQrisGenerationFailed($order);
             }
@@ -345,6 +348,7 @@ class CheckoutController extends Controller
                         'order_id' => $currentOrder->id,
                         'history_id' => $currentOrder->qrisly_history_id,
                         'decision' => 'generation_failed:'.$exception::class,
+                        'failure_reason' => $this->qrisGenerationFailureReason($exception),
                     ]);
                     $this->markQrisGenerationFailed($currentOrder);
                 }
@@ -386,5 +390,30 @@ class CheckoutController extends Controller
                 $lockedOrder->update(['qris_payment_status' => 'failed']);
             }
         });
+    }
+
+    private function qrisGenerationFailureReason(Throwable $exception): string
+    {
+        if ($exception instanceof RequestException) {
+            return 'provider_http_'.$exception->response->status();
+        }
+
+        if ($exception instanceof ConnectionException) {
+            return 'provider_connection_error';
+        }
+
+        if ($exception instanceof \RuntimeException) {
+            return match ($exception->getMessage()) {
+                'QRISLY is not configured.' => 'qrisly_not_configured',
+                'QRISLY requires an HTTPS base URL.' => 'invalid_provider_url',
+                'Order total is outside QRISLY limits.' => 'amount_out_of_range',
+                'QRISLY returned an invalid QRIS response.' => 'invalid_provider_response',
+                'QRISLY returned an amount that does not match the order total.' => 'amount_mismatch',
+                'QRISLY returned an unusable QRIS payload.' => 'invalid_qris_payload',
+                default => 'runtime_exception',
+            };
+        }
+
+        return class_basename($exception);
     }
 }

@@ -636,7 +636,8 @@ export default function Checkout({
                         </main>
                         <Dialog open>
                             <DialogContent
-                                className="z-[90] max-h-[90svh] overflow-y-auto bg-white text-neutral-900 sm:max-w-md"
+                                showCloseButton={false}
+                                className="z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto bg-white p-4 text-neutral-900 sm:max-h-[90dvh] sm:p-6"
                                 overlayClassName="z-[80]"
                             >
                                 <DialogHeader>
@@ -688,7 +689,7 @@ export default function Checkout({
                                             <img
                                                 src={order.qrisImage}
                                                 alt={t('checkout.qrisPayment')}
-                                                className="size-64 max-w-full rounded border border-neutral-200 bg-white p-2"
+                                                className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
                                             />
                                         )}
                                         {qrisSecondsRemaining !== null && (
@@ -895,7 +896,7 @@ export default function Checkout({
                                             | 'direct_cod',
                                     )
                                 }
-                                className="mt-2 w-full border border-neutral-300 px-3 py-3"
+                                className="mt-2 w-full border border-neutral-300 bg-white px-3 py-3 text-neutral-900 [color-scheme:light]"
                             >
                                 <option value="courier">
                                     {t('checkout.deliveryCourier')}
@@ -921,7 +922,7 @@ export default function Checkout({
                                 onChange={(event) =>
                                     setPaymentId(Number(event.target.value))
                                 }
-                                className="mt-2 w-full border border-neutral-300 px-3 py-3"
+                                className="mt-2 w-full border border-neutral-300 bg-white px-3 py-3 text-neutral-900 [color-scheme:light]"
                             >
                                 {paymentMethods.map((method) => (
                                     <option key={method.id} value={method.id}>
@@ -1206,7 +1207,8 @@ export default function Checkout({
             {order && keepCheckoutVisible && (
                 <Dialog open>
                     <DialogContent
-                        className="z-[90] max-h-[90svh] overflow-y-auto bg-white text-neutral-900 sm:max-w-md"
+                        showCloseButton={false}
+                        className="z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto bg-white p-4 text-neutral-900 sm:max-h-[90dvh] sm:p-6"
                         overlayClassName="z-[80]"
                     >
                         <DialogHeader>
@@ -1214,7 +1216,7 @@ export default function Checkout({
                                 {t('checkout.qrisPayment')}
                             </DialogTitle>
                             <DialogDescription className="text-neutral-600">
-                                {order.orderNumber} Â·{' '}
+                                {order.orderNumber} ·{' '}
                                 {isQrisExpired
                                     ? t('checkout.qrisStatus.expired')
                                     : paymentStatus === 'unpaid'
@@ -1248,7 +1250,7 @@ export default function Checkout({
                                     <img
                                         src={order.qrisImage}
                                         alt={t('checkout.qrisPayment')}
-                                        className="size-64 max-w-full rounded border border-neutral-200 bg-white p-2"
+                                        className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
                                     />
                                 )}
                                 {qrisSecondsRemaining !== null && (

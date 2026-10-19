@@ -185,6 +185,84 @@ it('does not store the provider placeholder as a QRIS payment code', function ()
     ]);
 });
 
+it('accepts the provider unique amount while preserving the order base amount', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-AMOUNT-MISMATCH');
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['payment_status' => 'expired'],
+        ]),
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => [
+                'history_id' => 8762,
+                'qris_string' => 'VALID_QRIS_PAYLOAD',
+                'original_amount' => 100000,
+                'final_amount' => 100001,
+                'payment_status' => 'unpaid',
+                'expiry_time' => now()->addMinutes(10)->toDateTimeString(),
+            ],
+        ]),
+    ]);
+
+    $this->actingAs($context['owner'])
+        ->post(route('checkout.orders.qris.regenerate', $context['order']))
+        ->assertRedirect(route('checkout.show'));
+
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/generate-qris')
+        && $request['amount'] === 100000
+        && $request['unique_amount'] === true);
+    $this->assertDatabaseHas('orders', [
+        'id' => $context['order']->id,
+        'qris_payment_status' => 'unpaid',
+        'qris_final_amount' => 100001,
+        'qris_string' => 'VALID_QRIS_PAYLOAD',
+    ]);
+});
+
+it('rejects a QRIS response when its original amount does not match the order', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-ORIGINAL-AMOUNT-MISMATCH');
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['payment_status' => 'expired'],
+        ]),
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => [
+                'history_id' => 8763,
+                'qris_string' => 'VALID_QRIS_PAYLOAD',
+                'original_amount' => 100001,
+                'final_amount' => 100002,
+                'payment_status' => 'unpaid',
+                'expiry_time' => now()->addMinutes(10)->toDateTimeString(),
+            ],
+        ]),
+    ]);
+
+    $this->actingAs($context['owner'])
+        ->post(route('checkout.orders.qris.regenerate', $context['order']))
+        ->assertRedirect(route('checkout.show'));
+
+    $this->assertDatabaseHas('orders', [
+        'id' => $context['order']->id,
+        'qris_payment_status' => 'failed',
+        'qris_string' => null,
+    ]);
+});
+
 it('rejects QRIS orders below the provider minimum before reserving stock', function () {
     Http::preventStrayRequests();
     Http::fake([
