@@ -150,9 +150,19 @@ class ProductController extends Controller
 
     private function syncImages(Product $product, SaveProductRequest $request): void
     {
-        if ($request->exists('existing_images')) {
+        if ($request->boolean('sync_existing_images')) {
             $keepIds = $request->input('existing_images', []);
-            $product->images()->whereNotIn('id', $keepIds)->get()->each(function ($image): void {
+            if (! is_array($keepIds)) {
+                $keepIds = [];
+            }
+
+            $imagesToDelete = $product->images();
+
+            if ($keepIds !== []) {
+                $imagesToDelete->whereNotIn('id', $keepIds);
+            }
+
+            $imagesToDelete->get()->each(function ($image): void {
                 Storage::disk('public')->delete($image->path);
                 $image->delete();
             });

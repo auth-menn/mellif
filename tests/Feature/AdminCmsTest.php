@@ -40,6 +40,46 @@ it('creates a product with ordered uploaded images and variants', function () {
     Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
 });
 
+it('removes deselected product images when replacing them with new uploads', function () {
+    Storage::fake('public');
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Studio Tee',
+        'slug' => 'studio-tee',
+        'description' => 'Cotton tee',
+        'price' => 199000,
+        'weight' => 620,
+        'is_active' => true,
+    ]);
+    Storage::disk('public')->put('products/old.jpg', 'old image');
+    $oldImage = $product->images()->create(['path' => 'products/old.jpg', 'sort_order' => 0]);
+
+    $this->actingAs($admin)->put(route('admin.products.update', $product), [
+        'category_id' => $category->id,
+        'name' => $product->name,
+        'description' => $product->description,
+        'price' => $product->price,
+        'weight' => $product->weight,
+        'is_active' => true,
+        'is_featured' => false,
+        'variants' => [['size' => 'M', 'stock' => 5]],
+        'sync_existing_images' => true,
+        'images' => [UploadedFile::fake()->image('replacement.jpg')],
+        'image_orders' => [0],
+    ])->assertRedirect(route('admin.products.index'));
+
+    $images = $product->images()->get();
+    expect($images)->toHaveCount(1);
+    $newImage = $images->firstOrFail();
+    expect($newImage->path)->not->toBe('products/old.jpg');
+    $this->assertDatabaseMissing('product_images', ['id' => $oldImage->id]);
+    Storage::disk('public')->assertMissing('products/old.jpg');
+    Storage::disk('public')->assertExists($newImage->path);
+});
+
 it('zeros stock for removed variants that are referenced by order history', function () {
     $admin = User::factory()->create();
     $admin->forceFill(['is_admin' => true])->save();

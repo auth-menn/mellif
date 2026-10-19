@@ -44,7 +44,8 @@ class SaveProductRequest extends FormRequest
             'image_orders.*' => ['integer', 'min:0', 'max:100'],
             'existing_image_orders' => ['nullable', 'array'],
             'existing_image_orders.*' => ['integer', 'min:0', 'max:100'],
-            'existing_images' => ['nullable', 'array'],
+            'sync_existing_images' => ['sometimes', 'boolean'],
+            'existing_images' => ['sometimes', 'array'],
             'existing_images.*' => ['integer', Rule::exists('product_images', 'id')],
         ];
     }

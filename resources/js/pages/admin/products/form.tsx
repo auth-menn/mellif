@@ -47,6 +47,7 @@ type ProductFormData = {
     variants: VariantInput[];
     images: File[];
     image_orders: number[];
+    sync_existing_images: boolean;
     existing_images: number[];
     existing_image_orders: Record<number, number>;
 };
@@ -89,6 +90,7 @@ export default function ProductForm({
         })) ?? [{ size: 'M', stock: '' }],
         images: [] as File[],
         image_orders: [] as number[],
+        sync_existing_images: product !== null,
         existing_images: product?.images.map((image) => image.id) ?? [],
         existing_image_orders: Object.fromEntries(
             product?.images.map((image) => [image.id, image.sort_order]) ?? [],
