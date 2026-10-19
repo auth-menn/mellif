@@ -175,9 +175,13 @@ class ProductController extends Controller
     {
         $sizes = collect($variants)->pluck('size');
         $product->variants()->whereNotIn('size', $sizes)->get()->each(function (ProductVariant $variant): void {
-            if (! OrderItem::query()->where('variant_id', $variant->id)->exists()) {
-                $variant->delete();
+            if (OrderItem::query()->where('variant_id', $variant->id)->exists()) {
+                $variant->update(['stock' => 0]);
+
+                return;
             }
+
+            $variant->delete();
         });
 
         foreach ($variants as $variant) {

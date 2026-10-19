@@ -41,6 +41,15 @@ class QrislyService
             throw new RuntimeException('QRISLY returned an invalid QRIS response.');
         }
 
+        $originalAmount = filter_var($data['original_amount'], FILTER_VALIDATE_INT);
+        $finalAmount = filter_var($data['final_amount'], FILTER_VALIDATE_INT);
+
+        if ($originalAmount !== (int) $order->total
+            || $finalAmount === false
+            || $finalAmount < $originalAmount) {
+            throw new RuntimeException('QRISLY returned an amount that does not match the order total.');
+        }
+
         if (! is_string($data['qris_string']) || trim($data['qris_string']) === '' || str_contains($data['qris_string'], 'INVALID_DATA')) {
             throw new RuntimeException('QRISLY returned an unusable QRIS payload.');
         }
@@ -48,8 +57,8 @@ class QrislyService
         return [
             'history_id' => (int) $data['history_id'],
             'qris_string' => (string) $data['qris_string'],
-            'original_amount' => (int) $data['original_amount'],
-            'final_amount' => (int) $data['final_amount'],
+            'original_amount' => $originalAmount,
+            'final_amount' => $finalAmount,
             'payment_status' => (string) $data['payment_status'],
             'expiry_time' => (string) $data['expiry_time'],
         ];

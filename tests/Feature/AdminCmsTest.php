@@ -40,6 +40,64 @@ it('creates a product with ordered uploaded images and variants', function () {
     Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
 });
 
+it('zeros stock for removed variants that are referenced by order history', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+    $buyer = User::factory()->create();
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Studio Tee',
+        'slug' => 'studio-tee',
+        'description' => 'Cotton tee',
+        'price' => 199000,
+        'weight' => 620,
+        'is_active' => true,
+    ]);
+    $removedVariant = ProductVariant::query()->create([
+        'product_id' => $product->id,
+        'size' => 'M',
+        'stock' => 5,
+    ]);
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'order_number' => 'MLF-TEST-VARIANT',
+        'recipient_name' => 'Buyer',
+        'phone' => '0812345678',
+        'address' => 'Jakarta',
+        'shipping_courier' => 'JNE',
+        'shipping_cost' => 18000,
+        'payment_method' => 'QRIS',
+        'subtotal' => 199000,
+        'total' => 217000,
+    ]);
+    $order->items()->create([
+        'product_id' => $product->id,
+        'variant_id' => $removedVariant->id,
+        'product_name' => $product->name,
+        'size' => 'M',
+        'qty' => 1,
+        'unit_price' => 199000,
+    ]);
+
+    $this->actingAs($admin)->put(route('admin.products.update', $product), [
+        'category_id' => $category->id,
+        'name' => $product->name,
+        'description' => $product->description,
+        'price' => $product->price,
+        'weight' => $product->weight,
+        'is_active' => true,
+        'is_featured' => false,
+        'variants' => [['size' => 'L', 'stock' => 0]],
+    ])->assertRedirect(route('admin.products.index'));
+
+    expect($removedVariant->fresh()->stock)->toBe(0);
+
+    $this->get(route('shop.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('products.data.0.stock', 0));
+});
+
 it('restores order stock only once when rejecting an order', function () {
     $admin = User::factory()->create();
     $admin->forceFill(['is_admin' => true])->save();
