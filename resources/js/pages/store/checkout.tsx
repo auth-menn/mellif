@@ -4,14 +4,13 @@ import type { CartLine } from '@/types/store';
 import { money } from '@/types/store';
 import { store as placeOrder } from '@/routes/checkout';
 import { qrisStatus } from '@/routes/checkout/orders';
-import { cancel, regenerate } from '@/routes/checkout/orders/qris';
+import { regenerate } from '@/routes/checkout/orders/qris';
 import {
     destinations as destinationRoute,
     rates as ratesRoute,
 } from '@/routes/shipping';
 import { index as shopIndex } from '@/routes/shop';
 import AuthModal from '@/components/store/auth-modal';
-import CartRemoveDialog from '@/components/store/cart-remove-dialog';
 import {
     Dialog,
     DialogContent,
@@ -24,7 +23,6 @@ import {
     loadServerCart,
     mergeGuestCart,
     readGuestCart,
-    removeServerCartLine,
 } from '@/lib/cart-api';
 import { useTranslation } from '@/hooks/use-translation';
 
@@ -124,12 +122,10 @@ export default function Checkout({
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [authOpen, setAuthOpen] = useState(false);
     const [cartMessage, setCartMessage] = useState('');
-    const [pendingCartRemoval, setPendingCartRemoval] =
-        useState<CartLine | null>(null);
-    const [cartRemovalProcessing, setCartRemovalProcessing] = useState(false);
     const [orderConfirmOpen, setOrderConfirmOpen] = useState(false);
     const [orderSubmitting, setOrderSubmitting] = useState(false);
     const [keepCheckoutVisible, setKeepCheckoutVisible] = useState(false);
+    const [qrisModalOpen, setQrisModalOpen] = useState(Boolean(order));
     const [paymentStatus, setPaymentStatus] =
         useState<QrisPaymentStatus | null>(
             qrisPaymentStatus(order?.qrisPaymentStatus),
@@ -137,7 +133,6 @@ export default function Checkout({
     const [qrisSecondsRemaining, setQrisSecondsRemaining] = useState<
         number | null
     >(null);
-    const [cancelSubmitting, setCancelSubmitting] = useState(false);
     const [qrisRegenerating, setQrisRegenerating] = useState(false);
     const [destinationQuery, setDestinationQuery] = useState('');
     const [destination, setDestination] = useState<Destination | null>(null);
@@ -154,6 +149,10 @@ export default function Checkout({
     useEffect(() => {
         setPaymentStatus(qrisPaymentStatus(order?.qrisPaymentStatus));
     }, [order?.id, order?.qrisPaymentStatus]);
+
+    useEffect(() => {
+        if (order?.id) setQrisModalOpen(true);
+    }, [order?.id]);
 
     useEffect(() => {
         if (paymentStatus === 'paid') {
@@ -396,32 +395,6 @@ export default function Checkout({
         ) ?? null;
     const shipping = requiresShipping ? (selectedRate?.cost ?? 0) : 0;
 
-    const confirmCartRemoval = async (): Promise<void> => {
-        if (!pendingCartRemoval) return;
-        setCartRemovalProcessing(true);
-        try {
-            if (user) {
-                await removeServerCartLine(pendingCartRemoval.variant.id);
-            } else {
-                const nextCart = cart.filter(
-                    (line) => line.variant.id !== pendingCartRemoval.variant.id,
-                );
-                localStorage.setItem('mellif-cart', JSON.stringify(nextCart));
-                window.dispatchEvent(new Event('mellif-cart-updated'));
-            }
-            setCart((current) =>
-                current.filter(
-                    (line) => line.variant.id !== pendingCartRemoval.variant.id,
-                ),
-            );
-            setPendingCartRemoval(null);
-        } catch {
-            setCartMessage(t('cart.updateFailed'));
-        } finally {
-            setCartRemovalProcessing(false);
-        }
-    };
-
     const submitOrder = (): void => {
         if (requiresShipping && (!destination || !selectedRate)) return;
         setErrors({});
@@ -454,6 +427,7 @@ export default function Checkout({
                 onSuccess: () => {
                     if (selectedPaymentMethod?.code === 'qris') {
                         setKeepCheckoutVisible(true);
+                        setQrisModalOpen(true);
                     } else {
                         localStorage.removeItem('mellif-cart');
                         setCart([]);
@@ -625,7 +599,13 @@ export default function Checkout({
                             </h1>
                             <section className="mx-auto mt-8 max-w-xl border border-neutral-200 p-6 text-center">
                                 <p className="text-sm text-neutral-600">
-                                    {t('checkout.qrisStatus.unpaid')}
+                                    {paymentStatus === 'unpaid'
+                                        ? t('checkout.qrisStatus.unpaid')
+                                        : paymentStatus === 'expired'
+                                          ? t('checkout.qrisStatus.expired')
+                                          : paymentStatus === 'cancelled'
+                                            ? t('checkout.qrisStatus.cancelled')
+                                            : t('checkout.qrisStatus.failed')}
                                 </p>
                                 <p className="mt-2 text-lg font-semibold">
                                     {order.orderNumber}
@@ -633,9 +613,19 @@ export default function Checkout({
                                 <p className="mt-3 text-sm text-neutral-600">
                                     {t('checkout.paymentStatusAuto')}
                                 </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setQrisModalOpen(true)}
+                                    className="mt-4 bg-black px-4 py-2 text-sm text-white"
+                                >
+                                    {t('checkout.viewQris')}
+                                </button>
                             </section>
                         </main>
-                        <Dialog open>
+                        <Dialog
+                            open={qrisModalOpen}
+                            onOpenChange={setQrisModalOpen}
+                        >
                             <DialogContent
                                 showCloseButton={false}
                                 className="z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto bg-white p-4 text-neutral-900 sm:max-h-[90dvh] sm:p-6"
@@ -766,35 +756,17 @@ export default function Checkout({
                                     {t('checkout.paymentStatusAuto')}
                                 </p>
                                 {order.hasQris && (
-                                    <p className="text-center text-xs text-amber-700">
-                                        {t('checkout.qrisCancelNote')}
+                                    <p className="text-center text-xs text-neutral-500">
+                                        {t('checkout.qrisModalCloseNote')}
                                     </p>
                                 )}
                                 <DialogFooter className="border-t border-neutral-200 pt-4">
                                     <button
                                         type="button"
-                                        disabled={cancelSubmitting}
-                                        onClick={() =>
-                                            router.post(
-                                                cancel.url(order.id),
-                                                {},
-                                                {
-                                                    onStart: () =>
-                                                        setCancelSubmitting(
-                                                            true,
-                                                        ),
-                                                    onFinish: () =>
-                                                        setCancelSubmitting(
-                                                            false,
-                                                        ),
-                                                },
-                                            )
-                                        }
+                                        onClick={() => setQrisModalOpen(false)}
                                         className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50"
                                     >
-                                        {cancelSubmitting
-                                            ? t('checkout.processing')
-                                            : t('checkout.cancelPayment')}
+                                        {t('common.close')}
                                     </button>
                                 </DialogFooter>
                             </DialogContent>
@@ -812,6 +784,31 @@ export default function Checkout({
                 <h1 className="mb-8 text-center text-3xl font-medium">
                     {t('checkout.title')}
                 </h1>
+                {order && keepCheckoutVisible && (
+                    <section className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-neutral-200 bg-white p-4 text-sm">
+                        <div>
+                            <p className="font-medium text-neutral-900">
+                                {order.orderNumber}
+                            </p>
+                            <p className="mt-1 text-neutral-600">
+                                {paymentStatus === 'unpaid'
+                                    ? t('checkout.qrisStatus.unpaid')
+                                    : paymentStatus === 'expired'
+                                      ? t('checkout.qrisStatus.expired')
+                                      : paymentStatus === 'cancelled'
+                                        ? t('checkout.qrisStatus.cancelled')
+                                        : t('checkout.qrisStatus.failed')}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setQrisModalOpen(true)}
+                            className="bg-black px-4 py-2 text-white"
+                        >
+                            {t('checkout.viewQris')}
+                        </button>
+                    </section>
+                )}
                 <div className="grid gap-10 md:grid-cols-[1.3fr_.7fr]">
                     <section className="space-y-5">
                         <div>
@@ -1146,16 +1143,6 @@ export default function Checkout({
                                                         {t('cart.quantity')}:{' '}
                                                         {line.quantity}
                                                     </span>
-                                                    <button
-                                                        className="ml-1 text-red-600 underline transition-colors hover:text-red-800"
-                                                        onClick={() =>
-                                                            setPendingCartRemoval(
-                                                                line,
-                                                            )
-                                                        }
-                                                    >
-                                                        {t('cart.remove')}
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -1205,8 +1192,11 @@ export default function Checkout({
                     </aside>
                 </div>
             </main>
-            {order && keepCheckoutVisible && (
-                <Dialog open>
+            {order && keepCheckoutVisible && qrisModalOpen && (
+                <Dialog
+                    open={qrisModalOpen}
+                    onOpenChange={setQrisModalOpen}
+                >
                     <DialogContent
                         showCloseButton={false}
                         className="z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto bg-white p-4 text-neutral-900 sm:max-h-[90dvh] sm:p-6"
@@ -1317,35 +1307,17 @@ export default function Checkout({
                             {t('checkout.paymentStatusAuto')}
                         </p>
                         {order.hasQris && (
-                            <p className="text-center text-xs text-amber-700">
-                                {t('checkout.qrisCancelNote')}
+                            <p className="text-center text-xs text-neutral-500">
+                                {t('checkout.qrisModalCloseNote')}
                             </p>
                         )}
                         <DialogFooter className="border-t border-neutral-200 pt-4">
                             <button
                                 type="button"
-                                disabled={cancelSubmitting}
-                                onClick={() =>
-                                    router.post(
-                                        cancel.url(order.id),
-                                        {},
-                                        {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                            onStart: () =>
-                                                setCancelSubmitting(true),
-                                            onSuccess: () =>
-                                                setKeepCheckoutVisible(false),
-                                            onFinish: () =>
-                                                setCancelSubmitting(false),
-                                        },
-                                    )
-                                }
+                                onClick={() => setQrisModalOpen(false)}
                                 className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50"
                             >
-                                {cancelSubmitting
-                                    ? t('checkout.processing')
-                                    : t('checkout.cancelPayment')}
+                                {t('common.close')}
                             </button>
                         </DialogFooter>
                     </DialogContent>
@@ -1507,28 +1479,6 @@ export default function Checkout({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <CartRemoveDialog
-                open={pendingCartRemoval !== null}
-                productName={pendingCartRemoval?.product.name ?? ''}
-                productImage={
-                    pendingCartRemoval?.product.images[0] ??
-                    '/storage/products/placeholder.svg'
-                }
-                size={pendingCartRemoval?.variant.size ?? ''}
-                quantity={pendingCartRemoval?.quantity ?? 0}
-                title={t('cart.removeConfirmTitle')}
-                description={t('cart.removeConfirmDescription')}
-                confirmLabel={t('cart.confirmRemove')}
-                cancelLabel={t('common.cancel')}
-                processing={cartRemovalProcessing}
-                onOpenChange={(open) => {
-                    if (!open && !cartRemovalProcessing)
-                        setPendingCartRemoval(null);
-                }}
-                onConfirm={() => {
-                    void confirmCartRemoval();
-                }}
-            />
             <AuthModal
                 open={authOpen}
                 onOpenChange={setAuthOpen}

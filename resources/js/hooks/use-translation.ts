@@ -202,14 +202,14 @@ const messages = {
             'QRIS sudah kedaluwarsa. Generate QRIS baru untuk melanjutkan pembayaran.',
         'checkout.qrisInstructions':
             'Pindai QR ini melalui aplikasi pembayaran untuk melanjutkan.',
+        'checkout.qrisModalCloseNote':
+            'Menutup modal hanya menyembunyikan QR. Pesanan dan QR tetap tersimpan.',
+        'checkout.viewQris': 'Lihat QRIS',
         'checkout.copyQris': 'Salin kode QRIS',
         'checkout.qrisCopied': 'Kode QRIS tersalin',
         'checkout.qrisGenerateFailed':
             'Pembayaran QRIS sementara tidak tersedia. Silakan coba lagi sebentar atau pilih metode pembayaran lain.',
         'checkout.qrisTryAgain': 'Generate QRIS',
-        'checkout.cancelPayment': 'Batal pembayaran',
-        'checkout.qrisCancelNote':
-            'Order dibatalkan, tetapi QRIS mungkin masih bisa dibayar sampai kedaluwarsa.',
         'checkout.orderCancelled': 'Pesanan dibatalkan',
         'checkout.qrisStatus.unpaid': 'Menunggu pembayaran',
         'checkout.qrisStatus.paid': 'Pembayaran selesai',
@@ -574,14 +574,14 @@ const messages = {
             'This QRIS has expired. Generate a new QRIS to continue payment.',
         'checkout.qrisInstructions':
             'Scan this QR with your payment app to continue.',
+        'checkout.qrisModalCloseNote':
+            'Closing this window only hides the QR. The order and QR remain saved.',
+        'checkout.viewQris': 'View QRIS',
         'checkout.copyQris': 'Copy QRIS code',
         'checkout.qrisCopied': 'QRIS code copied',
         'checkout.qrisGenerateFailed':
             'QRIS payment is temporarily unavailable. Please try again shortly or choose another payment method.',
         'checkout.qrisTryAgain': 'Generate QRIS again',
-        'checkout.cancelPayment': 'Cancel payment',
-        'checkout.qrisCancelNote':
-            'The order will be cancelled, but this QRIS may remain payable until it expires.',
         'checkout.orderCancelled': 'Order cancelled',
         'checkout.qrisStatus.unpaid': 'Waiting for payment',
         'checkout.qrisStatus.paid': 'Payment complete',
