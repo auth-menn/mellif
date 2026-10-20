@@ -458,6 +458,20 @@ export default function Checkout({
     const canGenerateQris = ['failed', 'expired', 'cancelled'].includes(
         paymentStatus ?? '',
     );
+    const hasActiveCheckoutQris = Boolean(
+        order &&
+            keepCheckoutVisible &&
+            order.hasQris &&
+            paymentStatus === 'unpaid',
+    );
+    const handlePlaceOrder = (): void => {
+        if (hasActiveCheckoutQris) {
+            setQrisModalOpen(true);
+            return;
+        }
+
+        setOrderConfirmOpen(true);
+    };
 
     if (order && !keepCheckoutVisible) {
         const isQrisOrder = order.paymentMethodCode === 'qris';
@@ -613,13 +627,6 @@ export default function Checkout({
                                 <p className="mt-3 text-sm text-neutral-600">
                                     {t('checkout.paymentStatusAuto')}
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() => setQrisModalOpen(true)}
-                                    className="mt-4 bg-black px-4 py-2 text-sm text-white"
-                                >
-                                    {t('checkout.viewQris')}
-                                </button>
                             </section>
                         </main>
                         <Dialog
@@ -628,15 +635,15 @@ export default function Checkout({
                         >
                             <DialogContent
                                 showCloseButton={false}
-                                className="z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto bg-white p-4 text-neutral-900 sm:max-h-[90dvh] sm:p-6"
+                                className="qris-payment-dialog z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md bg-white p-3 text-neutral-900 sm:p-5"
                                 overlayClassName="z-[80]"
                             >
-                                <DialogHeader>
+                                <DialogHeader className="qris-dialog-header">
                                     <DialogTitle>
                                         {t('checkout.qrisPayment')}
                                     </DialogTitle>
                                     <DialogDescription className="text-neutral-600">
-                                        {order.orderNumber} ·{' '}
+                                        {order.orderNumber} |{' '}
                                         {paymentStatus === 'unpaid' &&
                                         !isQrisExpired
                                             ? t('checkout.qrisStatus.unpaid')
@@ -651,11 +658,11 @@ export default function Checkout({
                                                   )}
                                     </DialogDescription>
                                 </DialogHeader>
-                                <div className="text-center">
-                                    <p className="text-sm text-neutral-600">
+                                <div className="qris-dialog-amount rounded-xl bg-neutral-50 px-4 py-2 text-center">
+                                    <p className="text-xs font-medium tracking-wide text-neutral-500">
                                         {t('checkout.amountToPay')}
                                     </p>
-                                    <p className="mt-1 text-3xl font-semibold">
+                                    <p className="mt-1 text-3xl font-semibold tracking-tight">
                                         {money(
                                             order.qrisFinalAmount ??
                                                 order.total,
@@ -664,7 +671,7 @@ export default function Checkout({
                                     {order.qrisExpiryTime &&
                                         paymentStatus === 'unpaid' &&
                                         !isQrisExpired && (
-                                            <p className="mt-2 text-xs text-neutral-500">
+                                            <p className="mt-2 text-xs leading-5 text-neutral-500">
                                                 {t('checkout.qrisExpires')}:{' '}
                                                 {new Date(
                                                     order.qrisExpiryTime,
@@ -675,7 +682,7 @@ export default function Checkout({
                                 {order.hasQris &&
                                 paymentStatus === 'unpaid' &&
                                 !isQrisExpired ? (
-                                    <div className="flex flex-col items-center gap-4">
+                                    <div className="qris-dialog-code flex flex-col items-center gap-2">
                                         {order.qrisImage && (
                                             <img
                                                 src={order.qrisImage}
@@ -686,7 +693,7 @@ export default function Checkout({
                                         {qrisSecondsRemaining !== null && (
                                             <p
                                                 aria-live="polite"
-                                                className="text-sm font-medium text-neutral-700 tabular-nums"
+                                                className="rounded-full bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 tabular-nums"
                                             >
                                                 {t(
                                                     'checkout.qrisTimeRemaining',
@@ -695,6 +702,14 @@ export default function Checkout({
                                                 {String(
                                                     Math.floor(
                                                         qrisSecondsRemaining /
+                                                            3600,
+                                                    ),
+                                                ).padStart(2, '0')}
+                                                :
+                                                {String(
+                                                    Math.floor(
+                                                        (qrisSecondsRemaining %
+                                                            3600) /
                                                             60,
                                                     ),
                                                 ).padStart(2, '0')}
@@ -704,7 +719,7 @@ export default function Checkout({
                                                 ).padStart(2, '0')}
                                             </p>
                                         )}
-                                        <p className="text-center text-sm text-neutral-600">
+                                        <p className="max-w-sm text-center text-sm leading-6 text-neutral-600">
                                             {t('checkout.qrisInstructions')}
                                         </p>
                                     </div>
@@ -752,19 +767,14 @@ export default function Checkout({
                                         )}
                                     </div>
                                 )}
-                                <p className="text-center text-xs text-neutral-500">
-                                    {t('checkout.paymentStatusAuto')}
-                                </p>
-                                {order.hasQris && (
-                                    <p className="text-center text-xs text-neutral-500">
-                                        {t('checkout.qrisModalCloseNote')}
-                                    </p>
-                                )}
-                                <DialogFooter className="border-t border-neutral-200 pt-4">
+                                <div className="qris-dialog-info space-y-1 rounded-lg bg-neutral-50 px-3 py-2 text-center text-xs leading-5 text-neutral-500">
+                                    <p>{t('checkout.paymentStatusAuto')}</p>
+                                </div>
+                                <DialogFooter className="qris-dialog-footer border-t border-neutral-200 pt-2">
                                     <button
                                         type="button"
                                         onClick={() => setQrisModalOpen(false)}
-                                        className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                                        className="w-full border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
                                     >
                                         {t('common.close')}
                                     </button>
@@ -784,31 +794,6 @@ export default function Checkout({
                 <h1 className="mb-8 text-center text-3xl font-medium">
                     {t('checkout.title')}
                 </h1>
-                {order && keepCheckoutVisible && (
-                    <section className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-neutral-200 bg-white p-4 text-sm">
-                        <div>
-                            <p className="font-medium text-neutral-900">
-                                {order.orderNumber}
-                            </p>
-                            <p className="mt-1 text-neutral-600">
-                                {paymentStatus === 'unpaid'
-                                    ? t('checkout.qrisStatus.unpaid')
-                                    : paymentStatus === 'expired'
-                                      ? t('checkout.qrisStatus.expired')
-                                      : paymentStatus === 'cancelled'
-                                        ? t('checkout.qrisStatus.cancelled')
-                                        : t('checkout.qrisStatus.failed')}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setQrisModalOpen(true)}
-                            className="bg-black px-4 py-2 text-white"
-                        >
-                            {t('checkout.viewQris')}
-                        </button>
-                    </section>
-                )}
                 <div className="grid gap-10 md:grid-cols-[1.3fr_.7fr]">
                     <section className="space-y-5">
                         <div>
@@ -1184,7 +1169,7 @@ export default function Checkout({
                                 (requiresShipping &&
                                     (!destination || !selectedRate))
                             }
-                            onClick={() => setOrderConfirmOpen(true)}
+                            onClick={handlePlaceOrder}
                             className="mt-5 w-full bg-black py-4 text-sm font-medium text-white disabled:opacity-40"
                         >
                             {t('checkout.placeOrder')}
@@ -1199,15 +1184,15 @@ export default function Checkout({
                 >
                     <DialogContent
                         showCloseButton={false}
-                        className="z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto bg-white p-4 text-neutral-900 sm:max-h-[90dvh] sm:p-6"
+                        className="qris-payment-dialog z-[90] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md bg-white p-3 text-neutral-900 sm:p-5"
                         overlayClassName="z-[80]"
                     >
-                        <DialogHeader>
+                        <DialogHeader className="qris-dialog-header">
                             <DialogTitle>
                                 {t('checkout.qrisPayment')}
                             </DialogTitle>
                             <DialogDescription className="text-neutral-600">
-                                {order.orderNumber} ·{' '}
+                                {order.orderNumber} |{' '}
                                 {isQrisExpired
                                     ? t('checkout.qrisStatus.expired')
                                     : paymentStatus === 'unpaid'
@@ -1215,17 +1200,17 @@ export default function Checkout({
                                       : t('checkout.qrisStatus.failed')}
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="text-center">
-                            <p className="text-sm text-neutral-600">
+                        <div className="qris-dialog-amount rounded-xl bg-neutral-50 px-4 py-2 text-center">
+                            <p className="text-xs font-medium tracking-wide text-neutral-500">
                                 {t('checkout.amountToPay')}
                             </p>
-                            <p className="mt-1 text-3xl font-semibold">
+                            <p className="mt-1 text-3xl font-semibold tracking-tight">
                                 {money(order.qrisFinalAmount ?? order.total)}
                             </p>
                             {order.qrisExpiryTime &&
                                 paymentStatus === 'unpaid' &&
                                 !isQrisExpired && (
-                                    <p className="mt-2 text-xs text-neutral-500">
+                                    <p className="mt-2 text-xs leading-5 text-neutral-500">
                                         {t('checkout.qrisExpires')}:{' '}
                                         {new Date(
                                             order.qrisExpiryTime,
@@ -1236,7 +1221,7 @@ export default function Checkout({
                         {order.hasQris &&
                         paymentStatus === 'unpaid' &&
                         !isQrisExpired ? (
-                            <div className="flex flex-col items-center gap-4">
+                            <div className="qris-dialog-code flex flex-col items-center gap-2">
                                 {order.qrisImage && (
                                     <img
                                         src={order.qrisImage}
@@ -1247,12 +1232,19 @@ export default function Checkout({
                                 {qrisSecondsRemaining !== null && (
                                     <p
                                         aria-live="polite"
-                                        className="text-sm font-medium text-neutral-700 tabular-nums"
+                                        className="rounded-full bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 tabular-nums"
                                     >
                                         {t('checkout.qrisTimeRemaining')}:{' '}
                                         {String(
                                             Math.floor(
-                                                qrisSecondsRemaining / 60,
+                                                qrisSecondsRemaining / 3600,
+                                            ),
+                                        ).padStart(2, '0')}
+                                        :
+                                        {String(
+                                            Math.floor(
+                                                (qrisSecondsRemaining % 3600) /
+                                                    60,
                                             ),
                                         ).padStart(2, '0')}
                                         :
@@ -1261,7 +1253,7 @@ export default function Checkout({
                                         ).padStart(2, '0')}
                                     </p>
                                 )}
-                                <p className="text-center text-sm text-neutral-600">
+                                <p className="max-w-sm text-center text-sm leading-6 text-neutral-600">
                                     {t('checkout.qrisInstructions')}
                                 </p>
                             </div>
@@ -1303,19 +1295,14 @@ export default function Checkout({
                                 )}
                             </div>
                         )}
-                        <p className="text-center text-xs text-neutral-500">
-                            {t('checkout.paymentStatusAuto')}
-                        </p>
-                        {order.hasQris && (
-                            <p className="text-center text-xs text-neutral-500">
-                                {t('checkout.qrisModalCloseNote')}
-                            </p>
-                        )}
-                        <DialogFooter className="border-t border-neutral-200 pt-4">
+                        <div className="qris-dialog-info space-y-1 rounded-lg bg-neutral-50 px-3 py-2 text-center text-xs leading-5 text-neutral-500">
+                            <p>{t('checkout.paymentStatusAuto')}</p>
+                        </div>
+                        <DialogFooter className="qris-dialog-footer border-t border-neutral-200 pt-2">
                             <button
                                 type="button"
                                 onClick={() => setQrisModalOpen(false)}
-                                className="w-full border border-neutral-300 px-4 py-3 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                                className="w-full border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
                             >
                                 {t('common.close')}
                             </button>

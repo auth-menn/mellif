@@ -202,9 +202,6 @@ const messages = {
             'QRIS sudah kedaluwarsa. Generate QRIS baru untuk melanjutkan pembayaran.',
         'checkout.qrisInstructions':
             'Pindai QR ini melalui aplikasi pembayaran untuk melanjutkan.',
-        'checkout.qrisModalCloseNote':
-            'Menutup modal hanya menyembunyikan QR. Pesanan dan QR tetap tersimpan.',
-        'checkout.viewQris': 'Lihat QRIS',
         'checkout.copyQris': 'Salin kode QRIS',
         'checkout.qrisCopied': 'Kode QRIS tersalin',
         'checkout.qrisGenerateFailed':
@@ -574,9 +571,6 @@ const messages = {
             'This QRIS has expired. Generate a new QRIS to continue payment.',
         'checkout.qrisInstructions':
             'Scan this QR with your payment app to continue.',
-        'checkout.qrisModalCloseNote':
-            'Closing this window only hides the QR. The order and QR remain saved.',
-        'checkout.viewQris': 'View QRIS',
         'checkout.copyQris': 'Copy QRIS code',
         'checkout.qrisCopied': 'QRIS code copied',
         'checkout.qrisGenerateFailed':

@@ -252,6 +252,79 @@
     outline-offset: 2px;
 }
 
+.qris-payment-dialog {
+    grid-template-areas:
+        "header"
+        "amount"
+        "code"
+        "info"
+        "footer";
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    overflow: hidden;
+}
+
+.qris-dialog-header {
+    grid-area: header;
+    gap: 0.35rem;
+}
+
+.qris-dialog-amount {
+    grid-area: amount;
+}
+
+.qris-dialog-code {
+    grid-area: code;
+    min-height: 0;
+}
+
+.qris-dialog-code img {
+    width: min(64vw, 28dvh, 16rem);
+    height: min(64vw, 28dvh, 16rem);
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.qris-dialog-info {
+    grid-area: info;
+}
+
+.qris-dialog-footer {
+    grid-area: footer;
+}
+
+@media (max-height: 700px) and (orientation: portrait) {
+    .qris-dialog-code img {
+        width: min(64vw, 24dvh, 16rem);
+        height: min(64vw, 24dvh, 16rem);
+    }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+    .qris-payment-dialog {
+        width: min(calc(100vw - 1rem), 52rem);
+        max-width: min(calc(100vw - 1rem), 52rem);
+        grid-template-areas:
+            "header header"
+            "amount code"
+            "info code"
+            "footer footer";
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        gap: 0.4rem 1rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .qris-dialog-code img {
+        width: min(30vw, 34dvh, 16rem);
+        height: min(30vw, 34dvh, 16rem);
+    }
+
+    .qris-dialog-amount p:nth-child(2) {
+        font-size: 1.75rem;
+        line-height: 2rem;
+    }
+}
+
 @layer base {
     * {
         @apply border-border;
