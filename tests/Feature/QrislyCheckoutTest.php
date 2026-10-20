@@ -317,11 +317,11 @@ it('denies another user access to QRIS cancellation and regeneration', function 
     $this->actingAs($otherUser)->post(route('checkout.orders.qris.regenerate', $context['order']))->assertNotFound();
 });
 
-it('returns the existing active QR instead of creating another one', function () {
+it('keeps the existing QR when the provider still reports unpaid, even after the local expiry time', function () {
     Http::preventStrayRequests();
     $context = makeCheckoutQrisOrder('MLF-QRIS-ACTIVE', [
         'qris_payment_status' => 'unpaid',
-        'qris_expiry_time' => now()->addMinutes(10),
+        'qris_expiry_time' => now()->subMinute(),
     ]);
     config([
         'services.qrisly.key' => 'test-qrisly-key',
@@ -338,7 +338,11 @@ it('returns the existing active QR instead of creating another one', function ()
         ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
 
     Http::assertSentCount(1);
-    $this->assertDatabaseHas('orders', ['id' => $context['order']->id, 'qris_regeneration_count' => 0]);
+    $this->assertDatabaseHas('orders', [
+        'id' => $context['order']->id,
+        'qris_regeneration_count' => 0,
+        'qris_payment_status' => 'unpaid',
+    ]);
 });
 
 it('limits QRIS regeneration to three attempts per order', function () {

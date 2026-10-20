@@ -284,11 +284,8 @@ class CheckoutController extends Controller
                 abort_unless($currentOrder->payment_method_code === 'qris', 404);
                 abort_unless($currentOrder->status === 'pending_payment', 409);
 
-                $isExpiredByTime = $currentOrder->qris_expiry_time?->isPast() ?? false;
-                $canRegenerate = in_array($currentOrder->qris_payment_status, ['failed', 'expired', 'cancelled'], true)
-                    || ($currentOrder->qris_payment_status === 'unpaid' && $isExpiredByTime);
+                $canRegenerate = in_array($currentOrder->qris_payment_status, ['failed', 'expired', 'cancelled'], true);
                 $hasActiveQr = $currentOrder->qris_payment_status === 'unpaid'
-                    && ! $isExpiredByTime
                     && $currentOrder->qrisly_history_id !== null;
                 abort_unless($canRegenerate || $hasActiveQr, 409);
 
@@ -312,7 +309,9 @@ class CheckoutController extends Controller
                         return redirect()->route('checkout.show', ['order' => $currentOrder->order_number]);
                     }
 
-                    if ($providerStatus === 'unpaid' && ! $isExpiredByTime) {
+                    if ($providerStatus === 'unpaid') {
+                        $settlement->synchronize($currentOrder, $providerStatus, 'payment.regeneration_check');
+
                         return redirect()->route('checkout.show', ['order' => $currentOrder->order_number]);
                     }
 
