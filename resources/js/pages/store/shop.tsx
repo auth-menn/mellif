@@ -52,7 +52,7 @@ export default function Shop({ products, categories, sizes, filters, priceRange 
     const visit = (overrides: Record<string, string | undefined> = {}): void => {
         const params: Record<string, string | undefined> = { ...filters, ...overrides };
         Object.keys(params).forEach((key) => params[key] === undefined || params[key] === '' ? delete params[key] : undefined);
-        router.get(shopIndex.url({ query: params }), params, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(shopIndex.url(), params, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     useEffect(() => {

@@ -64,6 +64,38 @@ it('shows active products with zero stock in the shop and filters them out when 
         ->assertInertia(fn ($page) => $page->where('products.total', 0));
 });
 
+it('combines the selected shop category and size filters on the same product', function () {
+    $categoryA = Category::query()->create(['name' => 'Category A', 'slug' => 'category-a']);
+    $categoryB = Category::query()->create(['name' => 'Category B', 'slug' => 'category-b']);
+
+    $productA = Product::query()->create([
+        'category_id' => $categoryA->id,
+        'name' => 'Product A',
+        'slug' => 'product-a-filter-test',
+        'description' => 'Product A sizes',
+        'price' => 100000,
+        'is_active' => true,
+    ]);
+    ProductVariant::query()->create(['product_id' => $productA->id, 'size' => 'S', 'stock' => 1]);
+    ProductVariant::query()->create(['product_id' => $productA->id, 'size' => 'L', 'stock' => 1]);
+
+    $productB = Product::query()->create([
+        'category_id' => $categoryB->id,
+        'name' => 'Product B',
+        'slug' => 'product-b-filter-test',
+        'description' => 'Product B sizes',
+        'price' => 100000,
+        'is_active' => true,
+    ]);
+    ProductVariant::query()->create(['product_id' => $productB->id, 'size' => 'L', 'stock' => 1]);
+    ProductVariant::query()->create(['product_id' => $productB->id, 'size' => 'XL', 'stock' => 1]);
+    ProductVariant::query()->create(['product_id' => $productB->id, 'size' => 'XXL', 'stock' => 1]);
+
+    $this->get('/shop?categories='.$categoryB->id.'&size=S')
+        ->assertInertia(fn ($page) => $page
+            ->where('products.total', 0));
+});
+
 it('creates an order with server prices without reducing stock before QRIS payment', function () {
     config(['services.rajaongkir.key' => 'test-key', 'services.rajaongkir.origin_id' => 1391]);
     config([
