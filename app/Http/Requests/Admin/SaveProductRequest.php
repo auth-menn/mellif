@@ -39,7 +39,7 @@ class SaveProductRequest extends FormRequest
             'variants.*.size' => ['required', 'string', 'max:20', 'distinct'],
             'variants.*.stock' => ['required', 'integer', 'min:0'],
             'images' => ['nullable', 'array', 'max:8'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
             'image_orders' => ['nullable', 'array'],
             'image_orders.*' => ['integer', 'min:0', 'max:100'],
             'existing_image_orders' => ['nullable', 'array'],

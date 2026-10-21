@@ -215,6 +215,35 @@ it('stores multiple home videos and page two images for the storefront', functio
         ->where('productSlides.1.height', 800));
 });
 
+it('accepts CMS media larger than the former per-file upload limits', function () {
+    Storage::fake('public');
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
+
+    $this->actingAs($admin)->put(route('admin.home-settings.update'), [
+        'page2_images' => [UploadedFile::fake()->image('large-page.jpg')->size(5121)],
+        'hero_image' => UploadedFile::fake()->image('large-hero.jpg')->size(5121),
+    ])->assertRedirect();
+
+    $this->actingAs($admin)->post(route('admin.products.store'), [
+        'category_id' => $category->id,
+        'name' => 'Large Image Product',
+        'description' => 'Product with a large image',
+        'price' => 100000,
+        'weight' => 500,
+        'is_active' => 1,
+        'is_featured' => 0,
+        'variants' => [['size' => 'M', 'stock' => 1]],
+        'images' => [UploadedFile::fake()->image('large-product.jpg')->size(4097)],
+    ])->assertRedirect(route('admin.products.index'));
+
+    $product = Product::query()->where('name', 'Large Image Product')->firstOrFail();
+
+    expect($product->images)->toHaveCount(1);
+    Storage::disk('public')->assertExists($product->images->firstOrFail()->path);
+});
+
 it('removes selected home media and keeps the rest', function () {
     Storage::fake('public');
     $admin = User::factory()->create();
