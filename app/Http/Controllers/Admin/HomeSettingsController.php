@@ -41,6 +41,11 @@ class HomeSettingsController extends Controller
         }
         $page2Images = array_values(array_filter($page2Images, fn (array $image, int $index): bool => ! isset($removedIndexes[$index]), ARRAY_FILTER_USE_BOTH));
         $productIds = array_values(array_filter($data['page2_product_ids'] ?? [], fn (mixed $id, int $index): bool => ! isset($removedIndexes[$index]), ARRAY_FILTER_USE_BOTH));
+        $validProductIds = Product::query()
+            ->whereKey(array_filter($productIds))
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [(string) $id => true])
+            ->all();
         $uploadedPaths = [];
         $oldHeroImage = StoreSetting::query()->where('key', 'hero_image')->value('value');
         $newHeroImage = null;
@@ -54,7 +59,10 @@ class HomeSettingsController extends Controller
             ], $uploadedImages, array_keys($uploadedImages))];
             foreach ($page2Images as $index => &$image) {
                 if ($index < count($productIds)) {
-                    $image['product_id'] = $productIds[$index];
+                    $productId = $productIds[$index];
+                    $image['product_id'] = $productId !== null && isset($validProductIds[(string) $productId])
+                        ? (int) $productId
+                        : null;
                 }
             }
             unset($image);

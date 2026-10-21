@@ -29,7 +29,7 @@ class SaveHomeSettingsRequest extends FormRequest
             'page2_images' => ['nullable', 'array'],
             'page2_images.*' => ['image', 'mimes:jpg,jpeg,png,webp'],
             'page2_product_ids' => ['nullable', 'array'],
-            'page2_product_ids.*' => ['nullable', 'integer', 'exists:products,id'],
+            'page2_product_ids.*' => ['nullable', 'integer'],
             'page2_upload_product_ids' => ['nullable', 'array'],
             'page2_upload_product_ids.*' => ['nullable', 'integer', 'exists:products,id'],
             'remove_page2_image_indexes' => ['nullable', 'array'],
