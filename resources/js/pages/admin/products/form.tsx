@@ -60,6 +60,10 @@ type SortableProductImage = {
     name: string;
     order: number;
 };
+type ProductImageCropRequest = {
+    file: File;
+    target: { kind: 'new'; index: number } | { kind: 'existing'; id: number; order: number };
+};
 
 function ProductImageCropDialog({
     file,
@@ -246,7 +250,8 @@ export default function ProductForm({
     const [newImagePreviews, setNewImagePreviews] = useState<
         { file: File; url: string }[]
     >([]);
-    const [cropImageIndex, setCropImageIndex] = useState<number | null>(null);
+    const [cropImageRequest, setCropImageRequest] = useState<ProductImageCropRequest | null>(null);
+    const [cropImageError, setCropImageError] = useState('');
     const [draggedImageKey, setDraggedImageKey] = useState<string | null>(null);
     useEffect(
         () => () =>
@@ -361,6 +366,66 @@ export default function ProductForm({
 
         form.setData('existing_image_orders', existingImageOrders);
         form.setData('image_orders', imageOrders);
+    };
+
+    const openImageCrop = async (image: SortableProductImage): Promise<void> => {
+        setCropImageError('');
+
+        if (image.kind === 'new') {
+            const file = form.data.images[image.index];
+            if (file) {
+                setCropImageRequest({ file, target: { kind: 'new', index: image.index } });
+            }
+            return;
+        }
+
+        if (image.id === undefined) return;
+
+        try {
+            const response = await fetch(image.url, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Image could not be loaded');
+
+            const blob = await response.blob();
+            const file = new File([blob], image.name, {
+                type: blob.type || 'image/jpeg',
+                lastModified: Date.now(),
+            });
+            setCropImageRequest({
+                file,
+                target: { kind: 'existing', id: image.id, order: image.order },
+            });
+        } catch {
+            setCropImageError(t('admin.cropFailed'));
+        }
+    };
+
+    const applyImageCrop = (croppedFile: File): void => {
+        if (!cropImageRequest) return;
+
+        if (cropImageRequest.target.kind === 'new') {
+            const files = [...form.data.images];
+            files[cropImageRequest.target.index] = croppedFile;
+            form.setData('images', files);
+            setNewImagePreviews(files.map((file) => ({
+                file,
+                url: URL.createObjectURL(file),
+            })));
+        } else {
+            const { id, order } = cropImageRequest.target;
+            const files = [...form.data.images, croppedFile];
+            form.setData('images', files);
+            form.setData('image_orders', [...form.data.image_orders, order]);
+            form.setData('existing_images', form.data.existing_images.filter((imageId) => imageId !== id));
+            const existingImageOrders = { ...form.data.existing_image_orders };
+            delete existingImageOrders[id];
+            form.setData('existing_image_orders', existingImageOrders);
+            setNewImagePreviews(files.map((file) => ({
+                file,
+                url: URL.createObjectURL(file),
+            })));
+        }
+
+        setCropImageRequest(null);
     };
 
     return (
@@ -676,12 +741,24 @@ export default function ProductForm({
                                 data-image-sort-key={image.key}
                                 className={`relative border border-border p-2 text-xs text-foreground transition-opacity ${draggedImageKey === image.key ? 'opacity-50' : ''}`}
                             >
-                                <img
-                                    src={image.url}
-                                    alt={image.name}
-                                    className="mb-2 aspect-square w-full object-cover"
-                                    draggable={false}
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => void openImageCrop(image)}
+                                    aria-label={`${t('admin.cropImage')}: ${image.name}`}
+                                    title={t('admin.cropImage')}
+                                    className="group relative mb-2 block w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                >
+                                    <img
+                                        src={image.url}
+                                        alt={image.name}
+                                        className="aspect-square w-full object-cover"
+                                        draggable={false}
+                                    />
+                                    <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 px-2 py-1 text-xs text-neutral-900 shadow-sm">
+                                        <Crop size={14} aria-hidden="true" />
+                                        {t('admin.cropImage')}
+                                    </span>
+                                </button>
                                 <span className="block truncate">{image.name}</span>
                                 <div className="mt-2 flex gap-2">
                                     <button
@@ -715,17 +792,6 @@ export default function ProductForm({
                                         <GripVertical size={15} aria-hidden="true" />
                                         {t('admin.reorderImage')}
                                     </button>
-                                    {image.kind === 'new' && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setCropImageIndex(image.index)}
-                                            aria-label={`${t('admin.cropImage')}: ${image.name}`}
-                                            className="inline-flex min-h-9 items-center justify-center gap-1 border border-input px-2 text-foreground transition-colors hover:bg-muted"
-                                        >
-                                            <Crop size={15} aria-hidden="true" />
-                                            {t('admin.cropImage')}
-                                        </button>
-                                    )}
                                 </div>
                                 <button
                                     type="button"
@@ -787,21 +853,13 @@ export default function ProductForm({
                         : t('admin.saveProduct')}
                 </button>
             </form>
-            {cropImageIndex !== null && form.data.images[cropImageIndex] && (
+            {cropImageError && <p role="alert" className="text-sm text-destructive">{cropImageError}</p>}
+            {cropImageRequest && (
                 <ProductImageCropDialog
-                    key={`${form.data.images[cropImageIndex].name}-${cropImageIndex}`}
-                    file={form.data.images[cropImageIndex]}
-                    onCancel={() => setCropImageIndex(null)}
-                    onApply={(croppedFile) => {
-                        const files = [...form.data.images];
-                        files[cropImageIndex] = croppedFile;
-                        form.setData('images', files);
-                        setNewImagePreviews(files.map((selectedFile) => ({
-                            file: selectedFile,
-                            url: URL.createObjectURL(selectedFile),
-                        })));
-                        setCropImageIndex(null);
-                    }}
+                    key={`${cropImageRequest.file.name}-${cropImageRequest.target.kind}-${cropImageRequest.target.kind === 'new' ? cropImageRequest.target.index : cropImageRequest.target.id}`}
+                    file={cropImageRequest.file}
+                    onCancel={() => setCropImageRequest(null)}
+                    onApply={applyImageCrop}
                 />
             )}
             <ConfirmDialog
