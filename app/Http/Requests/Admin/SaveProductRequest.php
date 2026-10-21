@@ -55,6 +55,18 @@ class SaveProductRequest extends FormRequest
         if ($this->input('discount_percent') === '') {
             $this->merge(['discount_percent' => null]);
         }
+
+        $variants = $this->input('variants');
+
+        if (is_array($variants)) {
+            foreach ($variants as $index => $variant) {
+                if (is_array($variant) && array_key_exists('stock', $variant) && ($variant['stock'] === '' || $variant['stock'] === null)) {
+                    $variants[$index]['stock'] = 0;
+                }
+            }
+
+            $this->merge(['variants' => $variants]);
+        }
     }
 
     protected function passedValidation(): void

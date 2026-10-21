@@ -40,6 +40,32 @@ it('creates a product with ordered uploaded images and variants', function () {
     Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
 });
 
+it('saves an empty variant stock as zero and shows the product as sold out', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
+
+    $this->actingAs($admin)->post(route('admin.products.store'), [
+        'category_id' => $category->id,
+        'name' => 'Unstocked Tee',
+        'description' => 'A tee with no stock entered',
+        'price' => 100000,
+        'weight' => 500,
+        'is_active' => 1,
+        'is_featured' => 0,
+        'variants' => [['size' => 'S', 'stock' => '']],
+    ])->assertRedirect(route('admin.products.index'));
+
+    $product = Product::query()->where('name', 'Unstocked Tee')->firstOrFail();
+
+    expect($product->variants()->firstOrFail()->stock)->toBe(0);
+
+    $this->get(route('shop.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('products.data.0.name', 'Unstocked Tee')
+            ->where('products.data.0.stock', 0));
+});
+
 it('removes deselected product images when replacing them with new uploads', function () {
     Storage::fake('public');
     $admin = User::factory()->create();
