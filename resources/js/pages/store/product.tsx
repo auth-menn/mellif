@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import ProductCard from '@/components/store/product-card';
 import CartAddDialog from '@/components/store/cart-add-dialog';
@@ -25,6 +25,12 @@ export default function ProductPage({ product, recommendations }: { product: Pro
     const [buyNowProcessing, setBuyNowProcessing] = useState(false);
     const [remainingStock, setRemainingStock] = useState(0);
     const images = product.images.length ? product.images : ['/storage/products/placeholder.svg'];
+    const showPreviousImage = (): void => {
+        setActiveImage((current) => (current - 1 + images.length) % images.length);
+    };
+    const showNextImage = (): void => {
+        setActiveImage((current) => (current + 1) % images.length);
+    };
 
     const requestAdd = (): void => {
         if (!variant || remainingStock === 0 || quantity > remainingStock) return;
@@ -116,6 +122,24 @@ export default function ProductPage({ product, recommendations }: { product: Pro
                                 </div>
                             ))}
                         </div>
+                        {images.length > 1 && <>
+                            <button
+                                type="button"
+                                onClick={showPreviousImage}
+                                aria-label={`${product.name} gambar sebelumnya`}
+                                className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-black shadow transition-colors hover:bg-white"
+                            >
+                                <ChevronLeft size={22} aria-hidden="true" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={showNextImage}
+                                aria-label={`${product.name} gambar berikutnya`}
+                                className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-black shadow transition-colors hover:bg-white"
+                            >
+                                <ChevronRight size={22} aria-hidden="true" />
+                            </button>
+                        </>}
                     </div>
                     {images.length > 1 && <div className="mt-3 flex w-full min-w-0 gap-2 overflow-x-auto">
                         {images.map((image, index) => <button key={`${image}-${index}`} type="button" onClick={() => setActiveImage(index)} aria-label={`${product.name} ${index + 1}`} aria-pressed={activeImage === index} className={`h-20 w-20 shrink-0 overflow-hidden border ${activeImage === index ? 'border-black' : 'border-transparent'}`}>

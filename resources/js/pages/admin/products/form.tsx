@@ -334,6 +334,7 @@ export default function ProductForm({
                                 />
                                 <button
                                     type="button"
+                                    disabled={form.data.variants.length <= 1}
                                     onClick={() =>
                                         form.setData(
                                             'variants',
@@ -343,7 +344,7 @@ export default function ProductForm({
                                             ),
                                         )
                                     }
-                                    className="px-3 font-medium text-destructive"
+                                    className="px-3 font-medium text-destructive disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     {t('admin.delete')}
                                 </button>
