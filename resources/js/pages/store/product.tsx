@@ -91,11 +91,11 @@ export default function ProductPage({ product, recommendations }: { product: Pro
                 <ArrowLeft size={17} strokeWidth={1.8} />
                 {t('product.backToShop')}
             </Link>
-            <div className="grid gap-8 md:grid-cols-2 md:gap-14">
-                <div>
-                    <div className="aspect-[.95] overflow-hidden bg-neutral-100">
+            <div className="grid min-w-0 gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-14">
+                <div className="w-full min-w-0">
+                    <div className="relative aspect-[.95] w-full min-w-0 overflow-hidden bg-neutral-100">
                         <div
-                            className="flex h-full transition-transform duration-500 ease-in-out motion-reduce:transition-none"
+                            className="absolute inset-y-0 left-0 flex h-full transition-transform duration-500 ease-in-out motion-reduce:transition-none"
                             style={{
                                 width: `${images.length * 100}%`,
                                 transform: `translateX(-${(activeImage * 100) / images.length}%)`,
@@ -117,7 +117,7 @@ export default function ProductPage({ product, recommendations }: { product: Pro
                             ))}
                         </div>
                     </div>
-                    {images.length > 1 && <div className="mt-3 flex gap-2 overflow-x-auto">
+                    {images.length > 1 && <div className="mt-3 flex w-full min-w-0 gap-2 overflow-x-auto">
                         {images.map((image, index) => <button key={`${image}-${index}`} type="button" onClick={() => setActiveImage(index)} aria-label={`${product.name} ${index + 1}`} aria-pressed={activeImage === index} className={`h-20 w-20 shrink-0 overflow-hidden border ${activeImage === index ? 'border-black' : 'border-transparent'}`}>
                             <img src={image} alt="" className="h-full w-full object-cover" />
                         </button>)}
