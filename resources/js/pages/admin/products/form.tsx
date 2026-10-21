@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, Crop, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import adminRoutes from '@/routes/admin';
 import { useTranslation } from '@/hooks/use-translation';
 import type { StoreVariant } from '@/types/store';
@@ -52,6 +52,173 @@ type ProductFormData = {
     existing_image_orders: Record<number, number>;
 };
 
+function ProductImageCropDialog({
+    file,
+    onCancel,
+    onApply,
+}: {
+    file: File;
+    onCancel: () => void;
+    onApply: (file: File) => void;
+}) {
+    const { t } = useTranslation();
+    const [source, setSource] = useState<HTMLImageElement | null>(null);
+    const [zoom, setZoom] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [error, setError] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const cropFailedMessage = t('admin.cropFailed');
+    const drag = useRef<{
+        x: number;
+        y: number;
+        offsetX: number;
+        offsetY: number;
+    } | null>(null);
+    const cropSize = 240;
+
+    useEffect(() => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => setSource(image);
+        image.onerror = () => setError(cropFailedMessage);
+        image.src = url;
+
+        return () => URL.revokeObjectURL(url);
+    }, [file, cropFailedMessage]);
+
+    const scale = source
+        ? Math.max(cropSize / source.naturalWidth, cropSize / source.naturalHeight) * zoom
+        : 1;
+    const imageWidth = source ? source.naturalWidth * scale : cropSize;
+    const imageHeight = source ? source.naturalHeight * scale : cropSize;
+    const offsetX = Math.max(-((imageWidth - cropSize) / 2), Math.min((imageWidth - cropSize) / 2, offset.x));
+    const offsetY = Math.max(-((imageHeight - cropSize) / 2), Math.min((imageHeight - cropSize) / 2, offset.y));
+
+    const applyCrop = async (): Promise<void> => {
+        if (!source) return;
+
+        setProcessing(true);
+        setError('');
+        const canvas = document.createElement('canvas');
+        const outputSize = 1200;
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+            setError(t('admin.cropFailed'));
+            setProcessing(false);
+            return;
+        }
+
+        const sourceX = (imageWidth / 2 - cropSize / 2 - offsetX) / scale;
+        const sourceY = (imageHeight / 2 - cropSize / 2 - offsetY) / scale;
+        const sourceSize = cropSize / scale;
+        context.drawImage(source, sourceX, sourceY, sourceSize, sourceSize, 0, 0, outputSize, outputSize);
+
+        const mimeType = file.type || 'image/jpeg';
+        const blob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob(resolve, mimeType, 0.92);
+        });
+
+        if (!blob) {
+            setError(t('admin.cropFailed'));
+            setProcessing(false);
+            return;
+        }
+
+        const outputType = blob.type || mimeType;
+        const extension = outputType.split('/')[1] ?? 'jpg';
+        const filename = `${file.name.replace(/\.[^.]+$/, '')}-cropped.${extension}`;
+        onApply(new File([blob], filename, { type: outputType, lastModified: Date.now() }));
+        setProcessing(false);
+    };
+
+    return (
+        <div
+            role="presentation"
+            onClick={onCancel}
+            className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-black/60 p-4"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="product-image-crop-title"
+                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-lg space-y-4 bg-card p-5 text-foreground shadow-xl"
+            >
+                <div className="flex items-center justify-between gap-3">
+                    <h2 id="product-image-crop-title" className="font-semibold">
+                        {t('admin.cropImage')}
+                    </h2>
+                    <button type="button" onClick={onCancel} aria-label={t('common.cancel')} className="grid size-9 place-items-center">
+                        <X size={18} />
+                    </button>
+                </div>
+                <p className="text-sm text-muted-foreground">{t('admin.cropImageHelp')}</p>
+                <div
+                    className="relative mx-auto touch-none overflow-hidden bg-neutral-900"
+                    style={{ width: cropSize, height: cropSize, maxWidth: '100%' }}
+                    onPointerDown={(event) => {
+                        drag.current = { x: event.clientX, y: event.clientY, offsetX, offsetY };
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                        if (!drag.current) return;
+                        const movement = drag.current;
+                        setOffset({
+                            x: movement.offsetX + event.clientX - movement.x,
+                            y: movement.offsetY + event.clientY - movement.y,
+                        });
+                    }}
+                    onPointerUp={() => { drag.current = null; }}
+                    onPointerCancel={() => { drag.current = null; }}
+                >
+                    {source ? (
+                        <img
+                            src={source.src}
+                            alt=""
+                            draggable={false}
+                            className="pointer-events-none absolute max-w-none select-none"
+                            style={{
+                                width: imageWidth,
+                                height: imageHeight,
+                                left: '50%',
+                                top: '50%',
+                                transform: `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`,
+                            }}
+                        />
+                    ) : (
+                        <div className="grid h-full place-items-center text-sm text-white">{t('admin.cropLoading')}</div>
+                    )}
+                </div>
+                <label className="block text-sm">
+                    {t('admin.cropZoom')}
+                    <input
+                        type="range"
+                        min="1"
+                        max="3"
+                        step="0.01"
+                        value={zoom}
+                        onChange={(event) => setZoom(Number(event.target.value))}
+                        className="mt-2 block w-full accent-primary"
+                    />
+                </label>
+                {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+                <div className="flex justify-end gap-2">
+                    <button type="button" onClick={onCancel} className="border border-input px-4 py-2 text-sm">
+                        {t('common.cancel')}
+                    </button>
+                    <button type="button" disabled={!source || processing} onClick={() => void applyCrop()} className="inline-flex items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+                        <Check size={16} />
+                        {t('admin.applyCrop')}
+                    </button>
+                </div>
+            </section>
+        </div>
+    );
+}
+
 export default function ProductForm({
     product,
     categories,
@@ -70,6 +237,7 @@ export default function ProductForm({
     const [newImagePreviews, setNewImagePreviews] = useState<
         { file: File; url: string }[]
     >([]);
+    const [cropImageIndex, setCropImageIndex] = useState<number | null>(null);
     useEffect(
         () => () =>
             newImagePreviews.forEach(({ url }) => URL.revokeObjectURL(url)),
@@ -511,6 +679,14 @@ export default function ProductForm({
                                 </span>
                                 <button
                                     type="button"
+                                    onClick={() => setCropImageIndex(index)}
+                                    className="mt-2 inline-flex w-full items-center justify-center gap-2 border border-input px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                                >
+                                    <Crop size={15} />
+                                    {t('admin.cropImage')}
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={() => {
                                         const files = form.data.images.filter(
                                             (_, fileIndex) =>
@@ -579,6 +755,23 @@ export default function ProductForm({
                         : t('admin.saveProduct')}
                 </button>
             </form>
+            {cropImageIndex !== null && form.data.images[cropImageIndex] && (
+                <ProductImageCropDialog
+                    key={`${form.data.images[cropImageIndex].name}-${cropImageIndex}`}
+                    file={form.data.images[cropImageIndex]}
+                    onCancel={() => setCropImageIndex(null)}
+                    onApply={(croppedFile) => {
+                        const files = [...form.data.images];
+                        files[cropImageIndex] = croppedFile;
+                        form.setData('images', files);
+                        setNewImagePreviews(files.map((selectedFile) => ({
+                            file: selectedFile,
+                            url: URL.createObjectURL(selectedFile),
+                        })));
+                        setCropImageIndex(null);
+                    }}
+                />
+            )}
             <ConfirmDialog
                 open={deleteConfirmOpen}
                 onOpenChange={setDeleteConfirmOpen}
