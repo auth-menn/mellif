@@ -28,7 +28,11 @@ class CartController extends Controller
                     Order::query()->whereBelongsTo($user)
                         ->where('payment_method_code', 'qris')
                         ->where('status', 'pending_payment')
-                        ->whereIn('qris_payment_status', ['unpaid', 'expired', 'failed', 'cancelled'])
+                        ->where('qris_payment_status', 'unpaid')
+                        ->where(function ($query) {
+                            $query->whereNull('qris_expiry_time')
+                                ->orWhere('qris_expiry_time', '>', now());
+                        })
                         ->with($orderItems)
                         ->latest('created_at')
                         ->limit(10)

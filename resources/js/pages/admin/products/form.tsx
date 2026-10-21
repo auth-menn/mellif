@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Check, Crop, X } from 'lucide-react';
+import { Check, Crop, GripVertical, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import adminRoutes from '@/routes/admin';
 import { useTranslation } from '@/hooks/use-translation';
@@ -50,6 +50,15 @@ type ProductFormData = {
     sync_existing_images: boolean;
     existing_images: number[];
     existing_image_orders: Record<number, number>;
+};
+type SortableProductImage = {
+    key: string;
+    kind: 'existing' | 'new';
+    id?: number;
+    index: number;
+    url: string;
+    name: string;
+    order: number;
 };
 
 function ProductImageCropDialog({
@@ -238,6 +247,7 @@ export default function ProductForm({
         { file: File; url: string }[]
     >([]);
     const [cropImageIndex, setCropImageIndex] = useState<number | null>(null);
+    const [draggedImageKey, setDraggedImageKey] = useState<string | null>(null);
     useEffect(
         () => () =>
             newImagePreviews.forEach(({ url }) => URL.revokeObjectURL(url)),
@@ -304,6 +314,53 @@ export default function ProductForm({
                 },
             },
         );
+    };
+
+    const sortableImages: SortableProductImage[] = [
+        ...(product?.images
+            .filter((image) => form.data.existing_images.includes(image.id))
+            .map((image, index) => ({
+                key: `existing:${image.id}`,
+                kind: 'existing' as const,
+                id: image.id,
+                index,
+                url: `/storage/${image.path}`,
+                name: image.path.split('/').pop() ?? image.path,
+                order: form.data.existing_image_orders[image.id] ?? image.sort_order,
+            })) ?? []),
+        ...newImagePreviews.map(({ file, url }, index) => ({
+            key: `new:${index}`,
+            kind: 'new' as const,
+            index,
+            url,
+            name: file.name,
+            order: form.data.image_orders[index] ?? (product?.images.length ?? 0) + index,
+        })),
+    ].sort((first, second) => first.order - second.order);
+
+    const reorderImages = (sourceKey: string, targetKey: string): void => {
+        if (sourceKey === targetKey) return;
+
+        const reordered = [...sortableImages];
+        const sourceIndex = reordered.findIndex((image) => image.key === sourceKey);
+        const targetIndex = reordered.findIndex((image) => image.key === targetKey);
+        if (sourceIndex < 0 || targetIndex < 0) return;
+
+        const [image] = reordered.splice(sourceIndex, 1);
+        reordered.splice(targetIndex, 0, image);
+
+        const existingImageOrders = { ...form.data.existing_image_orders };
+        const imageOrders = [...form.data.image_orders];
+        reordered.forEach((item, position) => {
+            if (item.kind === 'existing' && item.id !== undefined) {
+                existingImageOrders[item.id] = position;
+            } else if (item.kind === 'new') {
+                imageOrders[item.index] = position;
+            }
+        });
+
+        form.setData('existing_image_orders', existingImageOrders);
+        form.setData('image_orders', imageOrders);
     };
 
     return (
@@ -584,14 +641,16 @@ export default function ProductForm({
                                         8 - form.data.existing_images.length,
                                     ),
                                 );
+                                const lastSortOrder = sortableImages.reduce(
+                                    (lastOrder, image) => Math.max(lastOrder, image.order),
+                                    -1,
+                                );
                                 form.setData('images', files);
                                 form.setData(
                                     'image_orders',
-                                    files.map(
-                                        (_, index) =>
-                                            index +
-                                            (product?.images.length ?? 0),
-                                    ),
+                                    files.map((_, index) => index < form.data.images.length
+                                        ? form.data.image_orders[index] ?? lastSortOrder + index + 1
+                                        : lastSortOrder + index - form.data.images.length + 1),
                                 );
                                 setNewImagePreviews(
                                     files.map((file) => ({
@@ -609,111 +668,84 @@ export default function ProductForm({
                             /8
                         </span>
                     </label>
-                    <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                        {product?.images
-                            .filter((image) =>
-                                form.data.existing_images.includes(image.id),
-                            )
-                            .map((image) => (
-                                <div
-                                    key={image.id}
-                                    className="relative border border-border p-2 text-xs text-foreground"
-                                >
-                                    <img
-                                        src={`/storage/${image.path}`}
-                                        alt=""
-                                        className="mb-2 aspect-square w-full object-cover"
-                                    />
-                                    <button
-                                        type="button"
-                                        aria-label={t('admin.delete')}
-                                        title={t('admin.delete')}
-                                        onClick={() =>
-                                            form.setData(
-                                                'existing_images',
-                                                form.data.existing_images.filter(
-                                                    (id) => id !== image.id,
-                                                ),
-                                            )
-                                        }
-                                        className="absolute top-3 right-3 grid size-8 place-items-center bg-white text-red-700 shadow-sm transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                    <input
-                                        type="number"
-                                        aria-label={t('admin.orderImage')}
-                                        value={
-                                            form.data.existing_image_orders[
-                                                image.id
-                                            ] ?? 0
-                                        }
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'existing_image_orders',
-                                                {
-                                                    ...form.data
-                                                        .existing_image_orders,
-                                                    [image.id]: Number(
-                                                        event.target.value,
-                                                    ),
-                                                },
-                                            )
-                                        }
-                                        className="mt-2 w-full border border-input px-2 py-1 text-foreground"
-                                    />
-                                </div>
-                            ))}
-                        {newImagePreviews.map(({ file, url }, index) => (
+                    <p className="mt-4 text-xs text-muted-foreground">{t('admin.reorderImagesHelp')}</p>
+                    <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+                        {sortableImages.map((image) => (
                             <div
-                                key={`${file.name}-${index}-${file.lastModified}`}
-                                className="relative border border-border p-2 text-xs text-foreground"
+                                key={image.key}
+                                data-image-sort-key={image.key}
+                                className={`relative border border-border p-2 text-xs text-foreground transition-opacity ${draggedImageKey === image.key ? 'opacity-50' : ''}`}
                             >
                                 <img
-                                    src={url}
-                                    alt={file.name}
+                                    src={image.url}
+                                    alt={image.name}
                                     className="mb-2 aspect-square w-full object-cover"
+                                    draggable={false}
                                 />
-                                <span className="block truncate">
-                                    {file.name}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => setCropImageIndex(index)}
-                                    className="mt-2 inline-flex w-full items-center justify-center gap-2 border border-input px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-                                >
-                                    <Crop size={15} />
-                                    {t('admin.cropImage')}
-                                </button>
+                                <span className="block truncate">{image.name}</span>
+                                <div className="mt-2 flex gap-2">
+                                    <button
+                                        type="button"
+                                        aria-label={`${t('admin.reorderImage')}: ${image.name}`}
+                                        title={t('admin.reorderImage')}
+                                        onPointerDown={(event) => {
+                                            event.preventDefault();
+                                            event.currentTarget.setPointerCapture(event.pointerId);
+                                            setDraggedImageKey(image.key);
+                                        }}
+                                        onPointerUp={(event) => {
+                                            const target = document
+                                                .elementFromPoint(event.clientX, event.clientY)
+                                                ?.closest<HTMLElement>('[data-image-sort-key]')
+                                                ?.dataset.imageSortKey;
+                                            if (target) reorderImages(image.key, target);
+                                            setDraggedImageKey(null);
+                                        }}
+                                        onPointerCancel={() => setDraggedImageKey(null)}
+                                        onKeyDown={(event) => {
+                                            if (!['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key)) return;
+                                            event.preventDefault();
+                                            const imageIndex = sortableImages.findIndex((item) => item.key === image.key);
+                                            const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+                                            const target = sortableImages[imageIndex + direction];
+                                            if (target) reorderImages(image.key, target.key);
+                                        }}
+                                        className="inline-flex min-h-9 flex-1 touch-none cursor-grab items-center justify-center gap-1 border border-input px-2 active:cursor-grabbing"
+                                    >
+                                        <GripVertical size={15} aria-hidden="true" />
+                                        {t('admin.reorderImage')}
+                                    </button>
+                                    {image.kind === 'new' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setCropImageIndex(image.index)}
+                                            aria-label={`${t('admin.cropImage')}: ${image.name}`}
+                                            className="inline-flex min-h-9 items-center justify-center gap-1 border border-input px-2 text-foreground transition-colors hover:bg-muted"
+                                        >
+                                            <Crop size={15} aria-hidden="true" />
+                                            {t('admin.cropImage')}
+                                        </button>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const files = form.data.images.filter(
-                                            (_, fileIndex) =>
-                                                fileIndex !== index,
-                                        );
+                                        if (image.kind === 'existing' && image.id !== undefined) {
+                                            form.setData('existing_images', form.data.existing_images.filter((id) => id !== image.id));
+                                            return;
+                                        }
+
+                                        const files = form.data.images.filter((_, fileIndex) => fileIndex !== image.index);
                                         form.setData('images', files);
-                                        form.setData(
-                                            'image_orders',
-                                            files.map(
-                                                (_, fileIndex) =>
-                                                    fileIndex +
-                                                    (product?.images.length ??
-                                                        0),
-                                            ),
-                                        );
-                                        setNewImagePreviews(
-                                            files.map((selectedFile) => ({
-                                                file: selectedFile,
-                                                url: URL.createObjectURL(
-                                                    selectedFile,
-                                                ),
-                                            })),
-                                        );
+                                        form.setData('image_orders', form.data.image_orders.filter((_, fileIndex) => fileIndex !== image.index));
+                                        setNewImagePreviews(files.map((selectedFile, fileIndex) => ({
+                                            file: selectedFile,
+                                            url: URL.createObjectURL(selectedFile),
+                                        })));
                                     }}
-                                    aria-label={t('admin.delete')}
+                                    aria-label={`${t('admin.delete')}: ${image.name}`}
                                     title={t('admin.delete')}
-                                    className="absolute top-3 right-3 grid size-8 place-items-center bg-white text-red-700 shadow-sm transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                                    className="absolute right-3 top-3 grid size-8 place-items-center bg-white text-red-700 shadow-sm transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
                                 >
                                     <X size={16} />
                                 </button>
