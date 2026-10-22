@@ -99,7 +99,7 @@ export default function UsersIndex({
                     <thead className="bg-muted text-muted-foreground">
                         <tr>
                             <th className="p-4 font-semibold">{t('admin.customer')}</th>
-                            <th className="p-4 font-semibold">{t('admin.phone')}</th>
+                            <th className="p-4 font-semibold">{t('admin.userPhone')}</th>
                             <th className="p-4 font-semibold">{t('admin.status')}</th>
                             <th className="p-4 font-semibold">{t('admin.registeredAt')}</th>
                             <th className="p-4 font-semibold">{t('admin.orderCount')}</th>

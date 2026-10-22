@@ -36,7 +36,6 @@ class ProductLaunched extends Mailable implements ShouldQueue
             with: [
                 'productUrl' => route('shop.show', $this->product->slug),
                 'productImageUrl' => $productImage ? asset('storage/'.$productImage->path) : null,
-                'price' => $this->product->discounted_price,
             ],
         );
     }

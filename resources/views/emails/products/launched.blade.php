@@ -13,10 +13,6 @@ Kami informasikan bahwa produk baru kini tersedia di {{ config('app.name') }}. I
 
 ## {{ $product->name }}
 
-{{ $product->description }}
-
-**Harga:** Rp {{ number_format($price, 0, ',', '.') }}
-
 <x-mail::button :url="$productUrl">
 Lihat Detail Produk
 </x-mail::button>
