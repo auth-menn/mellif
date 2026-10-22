@@ -200,6 +200,7 @@ const messages = {
         'checkout.orderProgress': 'Proses pesanan',
         'checkout.packingStatus': 'Sedang dikemas',
         'checkout.orderDetails': 'Detail pesanan',
+        'checkout.moreOrderItems': 'Pesanan ini juga mencakup produk lainnya.',
         'checkout.paymentLater':
             'Pesanan Anda tersimpan. Silakan ikuti petunjuk pembayaran yang tersedia untuk metode ini.',
         'checkout.qrisPayment': 'Pembayaran QRIS',
@@ -618,6 +619,7 @@ const messages = {
         'checkout.orderProgress': 'Order progress',
         'checkout.packingStatus': 'Being packed',
         'checkout.orderDetails': 'Order details',
+        'checkout.moreOrderItems': 'This order also includes additional products.',
         'checkout.paymentLater':
             'Your order is saved. Follow the payment instructions available for this method.',
         'checkout.qrisPayment': 'QRIS payment',

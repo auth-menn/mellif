@@ -293,6 +293,62 @@
     grid-area: footer;
 }
 
+.payment-success-card {
+    max-height: calc(100svh - 4.25rem);
+}
+
+@media (max-height: 600px) {
+    .payment-success-screen {
+        padding-top: 3rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .payment-success-card {
+        max-height: calc(100svh - 3.5rem);
+    }
+
+    .payment-success-description,
+    .payment-success-item:nth-child(n + 2) {
+        display: none;
+    }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+    .payment-success-screen {
+        padding-top: 3rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .payment-success-card {
+        max-width: 72rem;
+        max-height: calc(100svh - 3.5rem);
+    }
+
+    .payment-success-hero {
+        padding: 0.5rem 0.875rem;
+    }
+
+    .payment-success-content {
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        grid-template-rows: minmax(0, 1fr);
+        gap: 0.625rem;
+        padding: 0.625rem;
+    }
+
+    .payment-success-order,
+    .payment-success-summary {
+        gap: 0.5rem;
+    }
+
+    .payment-success-description {
+        display: none;
+    }
+
+    .payment-success-card footer {
+        padding: 0.5rem 0.625rem;
+    }
+}
+
 @media (max-height: 700px) and (orientation: portrait) {
     .qris-dialog-code img {
         width: min(64vw, 24dvh, 16rem);

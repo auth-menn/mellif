@@ -505,105 +505,102 @@ export default function Checkout({
                     title={`${isPaymentComplete ? t('checkout.accepted') : t('checkout.qrisPayment')} · Mellif Studio`}
                 />
                 {isPaymentComplete ? (
-                    <main className="mx-auto min-h-screen max-w-5xl px-5 pt-24 pb-16 sm:px-8 sm:pt-32 lg:px-10 lg:pt-36">
-                        <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_24px_80px_-40px_rgba(0,0,0,0.28)]">
-                            <div className="bg-neutral-950 px-6 py-8 text-center text-white sm:px-10 sm:py-10">
-                                <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20">
-                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-7 text-emerald-300">
+                    <main className="payment-success-screen mx-auto flex h-[100svh] w-full items-center justify-center overflow-hidden px-3 pt-14 pb-3 sm:px-6 sm:pt-16">
+                        <section className="payment-success-card flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_24px_80px_-40px_rgba(0,0,0,0.22)]">
+                            <header className="payment-success-hero flex shrink-0 items-center gap-3 border-b border-emerald-100 bg-emerald-50 px-4 py-3 sm:px-6 sm:py-4">
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm sm:size-11">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-5 sm:size-6">
                                         <path d="m5 12.5 4.5 4.5L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
                                     </svg>
                                 </div>
-                                <p className="mt-5 text-xs font-medium tracking-[.22em] text-white/60 uppercase">
-                                    {t('checkout.accepted')}
-                                </p>
-                                <h1 className="mt-2 text-2xl font-medium sm:text-3xl">
-                                    {t('checkout.paymentSuccessTitle')}
-                                </h1>
-                                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/70">
-                                    {t('checkout.paymentSuccessDescription')}
-                                </p>
-                            </div>
-                            <div className="grid gap-x-10 gap-y-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)] lg:p-10">
-                                <div className="space-y-6">
-                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-neutral-50 px-4 py-3">
-                                    <div>
-                                        <p className="text-xs text-neutral-500">{t('checkout.orderNumber')}</p>
-                                        <p className="mt-1 font-semibold tracking-wide text-neutral-900">{order.orderNumber}</p>
-                                    </div>
-                                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
-                                        <span className="size-1.5 rounded-full bg-emerald-500" />
-                                        {t('checkout.qrisStatus.paid')}
-                                    </span>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-semibold tracking-[.18em] text-emerald-800 uppercase sm:text-xs">
+                                        {t('checkout.accepted')}
+                                    </p>
+                                    <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-neutral-950 sm:text-xl">
+                                        {t('checkout.paymentSuccessTitle')}
+                                    </h1>
+                                    <p className="payment-success-description mt-1 text-xs leading-5 text-neutral-600 sm:text-sm">
+                                        {t('checkout.paymentSuccessDescription')}
+                                    </p>
                                 </div>
-                                <div>
-                                    <h2 className="text-sm font-semibold text-neutral-900">{t('checkout.orderDetails')}</h2>
-                                    <div className="mt-3 divide-y divide-neutral-100 rounded-xl border border-neutral-200 px-4">
-                                        {order.items.map((item, index) => (
-                                            <div key={`${item.name}-${item.size}-${index}`} className="flex items-center justify-between gap-4 py-3 text-sm">
-                                                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                                                    <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-neutral-100 sm:size-20">
-                                                        {item.imageUrl ? (
-                                                            <img src={item.imageUrl} alt={item.name} className="size-full object-cover" loading="lazy" />
-                                                        ) : (
-                                                            <div className="flex size-full items-center justify-center text-[10px] text-neutral-400">Mellif</div>
-                                                        )}
+                            </header>
+
+                            <div className="payment-success-content grid min-h-0 gap-3 p-3 sm:gap-4 sm:p-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.85fr)]">
+                                <div className="payment-success-order min-w-0 space-y-3">
+                                    <div className="flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-3 py-2.5">
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] text-neutral-500 sm:text-xs">{t('checkout.orderNumber')}</p>
+                                            <p className="mt-0.5 truncate text-sm font-semibold tracking-wide text-neutral-900 sm:text-base">{order.orderNumber}</p>
+                                        </div>
+                                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 ring-1 ring-emerald-200 sm:text-xs">
+                                            <span className="size-1.5 rounded-full bg-emerald-600" />
+                                            {t('checkout.qrisStatus.paid')}
+                                        </span>
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <h2 className="text-xs font-semibold text-neutral-900 sm:text-sm">{t('checkout.orderDetails')}</h2>
+                                        <div className="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200 px-3">
+                                            {order.items.slice(0, 2).map((item, index) => (
+                                                <div key={`${item.name}-${item.size}-${index}`} className="payment-success-item flex items-center justify-between gap-3 py-2">
+                                                    <div className="flex min-w-0 items-center gap-2.5">
+                                                        <div className="size-11 shrink-0 overflow-hidden rounded-md bg-neutral-100 sm:size-12">
+                                                            {item.imageUrl ? (
+                                                                <img src={item.imageUrl} alt={item.name} className="size-full object-cover" loading="lazy" />
+                                                            ) : (
+                                                                <div className="flex size-full items-center justify-center text-[9px] text-neutral-400">Mellif</div>
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="line-clamp-1 text-xs font-medium text-neutral-900 sm:text-sm">{item.name}</p>
+                                                            <p className="mt-0.5 text-[10px] text-neutral-500 sm:text-xs">{t('cart.size')} {item.size} | {t('cart.quantity')}: {item.quantity}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <p className="line-clamp-2 font-medium text-neutral-900">{item.name}</p>
-                                                        <p className="mt-1 text-xs text-neutral-500">{t('cart.size')} {item.size} · {t('cart.quantity')}: {item.quantity}</p>
-                                                    </div>
+                                                    <p className="shrink-0 text-xs text-neutral-700 sm:text-sm">{money(item.unitPrice * item.quantity)}</p>
                                                 </div>
-                                                <p className="shrink-0 text-neutral-700">{money(item.unitPrice * item.quantity)}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                                        <div className="rounded-xl border border-neutral-200 p-4">
-                                            <p className="text-xs text-neutral-500">{t('checkout.amountPaid')}</p>
-                                            <p className="mt-1 text-lg font-semibold text-neutral-900">{money(order.qrisFinalAmount ?? order.total)}</p>
-                                            <p className="mt-1 text-xs text-neutral-500">QRIS</p>
-                                        </div>
-                                        <div className="rounded-xl border border-neutral-200 p-4">
-                                            <p className="text-xs text-neutral-500">{t('checkout.orderProgress')}</p>
-                                            <p className="mt-1 font-semibold text-neutral-900">{t('checkout.packingStatus')}</p>
-                                            <p className="mt-1 text-xs leading-5 text-neutral-500">{t('checkout.packing')}</p>
+                                            ))}
+                                            {order.items.length > 2 && (
+                                                <p className="py-1.5 text-[10px] text-neutral-500 sm:text-xs">{t('checkout.moreOrderItems')}</p>
+                                            )}
                                         </div>
                                     </div>
-                                    <dl className="space-y-2 rounded-xl border border-neutral-200 p-4 text-sm">
-                                        <div className="flex justify-between gap-4 text-neutral-600"><dt>{t('checkout.subtotal')}</dt><dd>{money(order.subtotal)}</dd></div>
-                                        <div className="flex justify-between gap-4 text-neutral-600"><dt>{t('checkout.shipping')}</dt><dd>{money(order.shippingCost)}</dd></div>
-                                        <div className="flex justify-between gap-4 border-t border-neutral-200 pt-3 font-semibold text-neutral-900"><dt>{t('checkout.total')}</dt><dd>{money(order.total)}</dd></div>
+                                </div>
+
+                                <div className="payment-success-summary min-w-0 space-y-2.5">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="rounded-lg border border-neutral-200 px-3 py-2.5">
+                                            <p className="text-[10px] text-neutral-500 sm:text-xs">{t('checkout.amountPaid')}</p>
+                                            <p className="mt-0.5 text-sm font-semibold text-neutral-950 sm:text-base">{money(order.qrisFinalAmount ?? order.total)}</p>
+                                            <p className="mt-0.5 text-[10px] font-medium text-neutral-500 sm:text-xs">{isCodOrder ? 'COD' : 'QRIS'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-neutral-200 px-3 py-2.5">
+                                            <p className="text-[10px] text-neutral-500 sm:text-xs">{t('checkout.orderProgress')}</p>
+                                            <p className="mt-0.5 text-xs font-semibold text-neutral-950 sm:text-sm">{t('checkout.packingStatus')}</p>
+                                            <p className="payment-success-description mt-0.5 text-[10px] leading-4 text-neutral-500 sm:text-xs">{t('checkout.packing')}</p>
+                                        </div>
+                                    </div>
+
+                                    <dl className="space-y-1.5 rounded-lg border border-neutral-200 px-3 py-2.5 text-xs">
+                                        <div className="flex justify-between gap-3 text-neutral-600"><dt>{t('checkout.subtotal')}</dt><dd>{money(order.subtotal)}</dd></div>
+                                        <div className="flex justify-between gap-3 text-neutral-600"><dt>{t('checkout.shipping')}</dt><dd>{money(order.shippingCost)}</dd></div>
+                                        <div className="flex justify-between gap-3 border-t border-neutral-200 pt-1.5 font-semibold text-neutral-950"><dt>{t('checkout.total')}</dt><dd>{money(order.total)}</dd></div>
                                     </dl>
-                                    <div className="rounded-xl border border-neutral-200 px-4 py-3 text-sm">
-                                    <p className="text-xs text-neutral-500">{t('checkout.deliveryMethod')}</p>
-                                    <p className="mt-1 font-medium text-neutral-900">{order.shippingCourier}{order.shippingService ? ` · ${order.shippingService}` : ''}</p>
+
+                                    <div className="rounded-lg border border-neutral-200 px-3 py-2 text-xs sm:text-sm">
+                                        <p className="text-[10px] text-neutral-500 sm:text-xs">{t('checkout.deliveryMethod')}</p>
+                                        <p className="mt-0.5 truncate font-medium text-neutral-900">{order.shippingCourier}{order.shippingService ? ` | ${order.shippingService}` : ''}</p>
+                                        {isCodOrder && <p className="payment-success-description mt-1 text-[10px] leading-4 text-neutral-600 sm:text-xs">{t('checkout.codInstructions')}</p>}
                                     </div>
                                 </div>
                             </div>
+
+                            <footer className="shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 py-2.5 sm:px-5">
+                                <Link href={shopIndex.url()} className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-neutral-950 px-5 py-2.5 text-xs font-medium text-white transition-colors hover:bg-neutral-800 sm:w-auto sm:text-sm">
+                                    {t('checkout.continueShopping')}
+                                </Link>
+                            </footer>
                         </section>
-                        {isCodOrder && (
-                            <div className="mx-auto mt-8 max-w-xl rounded border border-neutral-200 bg-neutral-50 p-6 text-left">
-                                <p className="font-semibold text-neutral-900">
-                                    COD
-                                </p>
-                                <p className="mt-2 text-sm text-neutral-700">
-                                    {t('checkout.codInstructions')}
-                                </p>
-                                <p className="mt-2 text-sm text-neutral-700">
-                                    {t('checkout.packing')}
-                                </p>
-                            </div>
-                        )}
-                        <Link
-                            href={shopIndex.url()}
-                            className="mt-8 inline-block bg-black px-8 py-4 text-sm text-white"
-                        >
-                            {t('checkout.continueShopping')}
-                        </Link>
                     </main>
                 ) : isOrderCancelled ? (
                     <main className="mx-auto min-h-screen max-w-3xl px-6 pt-40 pb-20 text-center">
