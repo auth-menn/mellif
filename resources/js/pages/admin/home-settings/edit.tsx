@@ -37,7 +37,7 @@ function ImageCropDialog({ file, onCancel, onApply }: { file: File; onCancel: ()
     const [error, setError] = useState('');
     const cropFailedMessage = t('admin.cropFailed');
     const drag = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
-    const cropSize = 240;
+    const cropMaxSize = 240;
 
     useEffect(() => {
         const url = URL.createObjectURL(file);
@@ -48,18 +48,23 @@ function ImageCropDialog({ file, onCancel, onApply }: { file: File; onCancel: ()
         return () => URL.revokeObjectURL(url);
     }, [file, cropFailedMessage]);
 
-    const scale = source ? Math.max(cropSize / source.naturalWidth, cropSize / source.naturalHeight) * zoom : 1;
-    const imageWidth = source ? source.naturalWidth * scale : cropSize;
-    const imageHeight = source ? source.naturalHeight * scale : cropSize;
-    const offsetX = Math.max(-((imageWidth - cropSize) / 2), Math.min((imageWidth - cropSize) / 2, offset.x));
-    const offsetY = Math.max(-((imageHeight - cropSize) / 2), Math.min((imageHeight - cropSize) / 2, offset.y));
+    const aspectRatio = source ? source.naturalWidth / source.naturalHeight : 1;
+    const cropWidth = aspectRatio >= 1 ? cropMaxSize : cropMaxSize * aspectRatio;
+    const cropHeight = aspectRatio >= 1 ? cropMaxSize / aspectRatio : cropMaxSize;
+    const scale = source ? Math.max(cropWidth / source.naturalWidth, cropHeight / source.naturalHeight) * zoom : 1;
+    const imageWidth = source ? source.naturalWidth * scale : cropMaxSize;
+    const imageHeight = source ? source.naturalHeight * scale : cropMaxSize;
+    const offsetX = Math.max(-((imageWidth - cropWidth) / 2), Math.min((imageWidth - cropWidth) / 2, offset.x));
+    const offsetY = Math.max(-((imageHeight - cropHeight) / 2), Math.min((imageHeight - cropHeight) / 2, offset.y));
 
     const applyCrop = async (): Promise<void> => {
         if (!source) return;
         setProcessing(true);
         const canvas = document.createElement('canvas');
-        canvas.width = 1200;
-        canvas.height = 1200;
+        const outputWidth = aspectRatio >= 1 ? 1200 : Math.round(1200 * aspectRatio);
+        const outputHeight = aspectRatio >= 1 ? Math.round(1200 / aspectRatio) : 1200;
+        canvas.width = outputWidth;
+        canvas.height = outputHeight;
         const context = canvas.getContext('2d');
         if (!context) {
             setError(t('admin.cropFailed'));
@@ -67,10 +72,11 @@ function ImageCropDialog({ file, onCancel, onApply }: { file: File; onCancel: ()
             return;
         }
 
-        const sourceX = (imageWidth / 2 - cropSize / 2 - offsetX) / scale;
-        const sourceY = (imageHeight / 2 - cropSize / 2 - offsetY) / scale;
-        const sourceSize = cropSize / scale;
-        context.drawImage(source, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 1200, 1200);
+        const sourceX = (imageWidth / 2 - cropWidth / 2 - offsetX) / scale;
+        const sourceY = (imageHeight / 2 - cropHeight / 2 - offsetY) / scale;
+        const sourceWidth = cropWidth / scale;
+        const sourceHeight = cropHeight / scale;
+        context.drawImage(source, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputWidth, outputHeight);
         const mimeType = file.type || 'image/jpeg';
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mimeType, 0.92));
         if (!blob) {
@@ -90,7 +96,7 @@ function ImageCropDialog({ file, onCancel, onApply }: { file: File; onCancel: ()
             <section role="dialog" aria-modal="true" aria-labelledby="home-image-crop-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-lg space-y-4 bg-card p-5 text-foreground shadow-xl">
                 <div className="flex items-center justify-between gap-3"><h2 id="home-image-crop-title" className="font-semibold">{t('admin.cropImage')}</h2><button type="button" onClick={onCancel} aria-label={t('common.cancel')} className="grid size-9 place-items-center"><X size={18} /></button></div>
                 <p className="text-sm text-muted-foreground">{t('admin.cropImageHelp')}</p>
-                <div className="relative mx-auto touch-none overflow-hidden bg-neutral-900" style={{ width: cropSize, height: cropSize, maxWidth: '100%' }}
+                <div className="relative mx-auto touch-none overflow-hidden bg-neutral-900" style={{ width: cropWidth, height: cropHeight, maxWidth: '100%' }}
                     onPointerDown={(event) => { drag.current = { x: event.clientX, y: event.clientY, offsetX, offsetY }; event.currentTarget.setPointerCapture(event.pointerId); }}
                     onPointerMove={(event) => { if (drag.current) setOffset({ x: drag.current.offsetX + event.clientX - drag.current.x, y: drag.current.offsetY + event.clientY - drag.current.y }); }}
                     onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
