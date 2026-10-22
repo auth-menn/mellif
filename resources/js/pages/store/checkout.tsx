@@ -86,26 +86,57 @@ function digitsOnly(value: string): string {
     return value.replace(/\D/g, '');
 }
 
-function downloadQrisImage(imageDataUrl: string, orderNumber: string): void {
-    const [metadata, encodedImage] = imageDataUrl.split(',', 2);
-    const imageContent = metadata.includes(';base64')
-        ? Uint8Array.from(atob(encodedImage), (character) =>
-              character.charCodeAt(0),
-          )
-        : decodeURIComponent(encodedImage);
-    const imageType = metadata.match(/^data:([^;]+)/)?.[1] ?? 'image/svg+xml';
-    const imageUrl = URL.createObjectURL(
-        new Blob([imageContent], { type: imageType }),
-    );
-    const downloadLink = document.createElement('a');
+async function downloadQrisImage(
+    imageDataUrl: string,
+    orderNumber: string,
+): Promise<void> {
+    const svgBlob = await (await fetch(imageDataUrl)).blob();
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const qrisImage = new Image();
 
-    downloadLink.href = imageUrl;
-    downloadLink.download = `QRIS-${orderNumber}.svg`;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    downloadLink.remove();
+    qrisImage.src = svgUrl;
 
-    window.setTimeout(() => URL.revokeObjectURL(imageUrl), 1000);
+    try {
+        await qrisImage.decode();
+
+        const canvas = document.createElement('canvas');
+        const resolution = 1200;
+        canvas.width = resolution;
+        canvas.height = resolution;
+
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+            throw new Error('Canvas is not available to export the QRIS.');
+        }
+
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, resolution, resolution);
+        context.imageSmoothingEnabled = false;
+        context.drawImage(qrisImage, 0, 0, resolution, resolution);
+
+        const pngBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('The QRIS image could not be exported.'));
+                }
+            }, 'image/png');
+        });
+        const imageUrl = URL.createObjectURL(pngBlob);
+        const downloadLink = document.createElement('a');
+
+        downloadLink.href = imageUrl;
+        downloadLink.download = `QRIS-${orderNumber}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+
+        window.setTimeout(() => URL.revokeObjectURL(imageUrl), 1000);
+    } finally {
+        URL.revokeObjectURL(svgUrl);
+    }
 }
 
 export default function Checkout({
