@@ -835,6 +835,15 @@ export default function Checkout({
                                     <textarea
                                         required={key !== 'address_detail'}
                                         value={form[key]}
+                                        placeholder={
+                                            key === 'address'
+                                                ? t(
+                                                      isDirectCod
+                                                          ? 'checkout.codMeetupLocationPlaceholder'
+                                                          : 'checkout.addressPlaceholder',
+                                                  )
+                                                : t('checkout.addressDetailPlaceholder')
+                                        }
                                         onChange={(event) =>
                                             setForm({
                                                 ...form,
@@ -850,6 +859,11 @@ export default function Checkout({
                                         inputMode={key === 'phone' ? 'numeric' : undefined}
                                         pattern={key === 'phone' ? '[0-9]*' : undefined}
                                         value={form[key]}
+                                        placeholder={
+                                            key === 'phone'
+                                                ? t('checkout.phonePlaceholder')
+                                                : t('checkout.recipientPlaceholder')
+                                        }
                                         onChange={(event) =>
                                             setForm({
                                                 ...form,
