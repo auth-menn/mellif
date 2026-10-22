@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveProductRequest;
+use App\Jobs\SendProductLaunchNotifications;
 use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -61,12 +62,18 @@ class ProductController extends Controller
      */
     public function store(SaveProductRequest $request): RedirectResponse
     {
-        DB::transaction(function () use ($request): void {
+        $product = DB::transaction(function () use ($request): Product {
             $data = $request->validated();
             $product = Product::query()->create($this->productAttributes($data));
             $this->syncImages($product, $request);
             $this->syncVariants($product, $data['variants']);
+
+            return $product;
         });
+
+        if ($product->is_active) {
+            SendProductLaunchNotifications::dispatch($product->id);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'admin.productCreated']);
 

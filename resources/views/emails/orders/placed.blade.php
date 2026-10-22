@@ -1,7 +1,7 @@
 <x-mail::message>
-# {{ $forAdmin ? 'Pesanan baru masuk' : 'Pesanan Anda diterima' }}
+# {{ $forAdmin ? 'Pemberitahuan Pesanan Baru' : 'Konfirmasi Penerimaan Pesanan' }}
 
-{{ $forAdmin ? 'Pesanan baru telah dibuat di Mellif Studio.' : 'Terima kasih telah berbelanja di Mellif Studio. Pesanan Anda sudah kami terima.' }}
+{{ $forAdmin ? 'Pesanan baru telah dibuat melalui website Mellif Studio.' : 'Terima kasih telah berbelanja di Mellif Studio. Pesanan Anda telah kami terima.' }}
 
 ## Pesanan {{ $order->order_number }}
 
@@ -38,6 +38,6 @@ Lihat pesanan
 @endif
 @endunless
 
-Thanks,<br>
+Hormat kami,<br>
 {{ config('app.name') }}
 </x-mail::message>

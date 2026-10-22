@@ -1,7 +1,7 @@
 <x-mail::message>
-# {{ $forAdmin ? 'Pembayaran pesanan diterima' : 'Pembayaran berhasil' }}
+# {{ $forAdmin ? 'Konfirmasi Pembayaran Pesanan' : 'Pembayaran Berhasil' }}
 
-{{ $forAdmin ? 'Pembayaran QRIS untuk pesanan berikut telah terkonfirmasi.' : 'Pembayaran Anda telah kami terima. Pesanan sedang diproses.' }}
+{{ $forAdmin ? 'Pembayaran untuk pesanan berikut telah dikonfirmasi.' : 'Pembayaran Anda telah kami terima. Pesanan Anda sedang diproses.' }}
 
 ## Pesanan {{ $order->order_number }}
 
@@ -33,6 +33,6 @@ Lihat pesanan
 </x-mail::button>
 @endunless
 
-Thanks,<br>
+Hormat kami,<br>
 {{ config('app.name') }}
 </x-mail::message>
