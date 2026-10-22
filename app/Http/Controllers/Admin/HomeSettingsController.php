@@ -34,13 +34,7 @@ class HomeSettingsController extends Controller
         $removedPaths = [];
         $heroVideos = $this->removeSelectedPaths($heroVideos, $data['remove_hero_video_indexes'] ?? [], $removedPaths);
         $removedIndexes = array_fill_keys(array_map('intval', $data['remove_page2_image_indexes'] ?? []), true);
-        foreach ($page2Images as $index => $image) {
-            if (isset($removedIndexes[$index])) {
-                $removedPaths[] = $image['path'];
-            }
-        }
-        $page2Images = array_values(array_filter($page2Images, fn (array $image, int $index): bool => ! isset($removedIndexes[$index]), ARRAY_FILTER_USE_BOTH));
-        $productIds = array_values(array_filter($data['page2_product_ids'] ?? [], fn (mixed $id, int $index): bool => ! isset($removedIndexes[$index]), ARRAY_FILTER_USE_BOTH));
+        $productIds = [...($data['page2_product_ids'] ?? []), ...($data['page2_upload_product_ids'] ?? [])];
         $validProductIds = Product::query()
             ->whereKey(array_filter($productIds))
             ->pluck('id')
@@ -53,19 +47,41 @@ class HomeSettingsController extends Controller
         try {
             $heroVideos = [...$heroVideos, ...$this->storeUploads($request->file('hero_videos', []), 'storefront/home/videos', $uploadedPaths)];
             $uploadedImages = $this->storeUploads($request->file('page2_images', []), 'storefront/home/images', $uploadedPaths);
-            $page2Images = [...$page2Images, ...array_map(fn (string $path, int $index): array => [
-                'path' => $path,
-                'product_id' => ($data['page2_upload_product_ids'][$index] ?? null) ?: null,
-            ], $uploadedImages, array_keys($uploadedImages))];
-            foreach ($page2Images as $index => &$image) {
-                if ($index < count($productIds)) {
-                    $productId = $productIds[$index];
-                    $image['product_id'] = $productId !== null && isset($validProductIds[(string) $productId])
+            $imagesByKey = [];
+            foreach ($page2Images as $index => $image) {
+                if (isset($removedIndexes[$index])) {
+                    $removedPaths[] = $image['path'];
+
+                    continue;
+                }
+
+                $productId = $data['page2_product_ids'][$index] ?? $image['product_id'];
+                $imagesByKey['existing-'.$index] = [
+                    'path' => $image['path'],
+                    'product_id' => $productId !== null && isset($validProductIds[(string) $productId])
                         ? (int) $productId
-                        : null;
+                        : null,
+                ];
+            }
+
+            foreach ($uploadedImages as $index => $path) {
+                $productId = $data['page2_upload_product_ids'][$index] ?? null;
+                $imagesByKey['upload-'.$index] = [
+                    'path' => $path,
+                    'product_id' => $productId !== null && isset($validProductIds[(string) $productId])
+                        ? (int) $productId
+                        : null,
+                ];
+            }
+
+            $page2Images = [];
+            $orderedKeys = $data['page2_image_order'] ?? [];
+            foreach ([...$orderedKeys, ...array_keys($imagesByKey)] as $key) {
+                if (isset($imagesByKey[$key])) {
+                    $page2Images[] = $imagesByKey[$key];
+                    unset($imagesByKey[$key]);
                 }
             }
-            unset($image);
 
             if ($request->hasFile('hero_image')) {
                 $newHeroImage = $request->file('hero_image')->store('storefront', 'public');
