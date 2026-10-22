@@ -80,16 +80,17 @@ it('shows confirmed revenue trends and order status totals to admins', function 
             ->where('ordersByStatus.pending_payment', 1));
 });
 
-it('returns hourly buckets for the selected daily revenue period', function () {
+it('returns seven date buckets for the selected weekly revenue period', function () {
+    $this->travelTo('2026-10-22 12:00:00');
     $admin = User::factory()->create(['is_admin' => true]);
 
     $this->actingAs($admin)
-        ->get(route('admin.dashboard', ['period' => 'daily']))
+        ->get(route('admin.dashboard', ['period' => 'weekly']))
         ->assertInertia(fn ($page) => $page
-            ->where('period', 'daily')
-            ->has('revenueTrend', 24)
-            ->where('revenueTrend.0.label', '00')
-            ->where('revenueTrend.23.label', '23'));
+            ->where('period', 'weekly')
+            ->has('revenueTrend', 7)
+            ->where('revenueTrend.0.label', '2026-10-19')
+            ->where('revenueTrend.6.label', '2026-10-25'));
 });
 
 it('returns monthly buckets for the selected yearly revenue period', function () {

@@ -3,6 +3,7 @@ import {
     AlertTriangle,
     ArrowRight,
     Clock3,
+    Languages,
     Package,
     ShoppingBag,
     TrendingUp,
@@ -38,10 +39,10 @@ type RevenuePoint = {
     orders: number;
 };
 
-type RevenuePeriod = 'daily' | 'monthly' | 'yearly';
+type RevenuePeriod = 'weekly' | 'monthly' | 'yearly';
 
 const revenuePeriodKeys: Record<RevenuePeriod, TranslationKey> = {
-    daily: 'admin.periodDaily',
+    weekly: 'admin.periodWeekly',
     monthly: 'admin.periodMonthly',
     yearly: 'admin.periodYearly',
 };
@@ -85,7 +86,7 @@ export default function AdminDashboard({
     recentOrders: Order[];
     manualReviewOrders: ManualReviewOrder[];
 }) {
-    const { language, t } = useTranslation();
+    const { language, setLanguage, t } = useTranslation();
     const locale = language === 'ID' ? 'id-ID' : 'en-US';
     const maxRevenue = Math.max(...revenueTrend.map((point) => point.revenue), 1);
     const totalOrders = Object.values(ordersByStatus).reduce(
@@ -153,6 +154,24 @@ export default function AdminDashboard({
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <div
+                            className="inline-flex min-h-10 items-center gap-1 border border-border bg-card p-1"
+                            role="group"
+                            aria-label={t('nav.language')}
+                        >
+                            <Languages size={16} className="mx-1 text-muted-foreground" aria-hidden="true" />
+                            {(['ID', 'EN'] as const).map((option) => (
+                                <button
+                                    key={option}
+                                    type="button"
+                                    aria-pressed={language === option}
+                                    onClick={() => setLanguage(option)}
+                                    className={`min-w-9 rounded-sm px-2 py-1 text-xs font-semibold transition-colors ${language === option ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
+                                >
+                                    {option}
+                                </button>
+                            ))}
+                        </div>
                         <Link
                             href={adminRoutes.orders.index.url()}
                             className="inline-flex min-h-10 items-center justify-center gap-2 border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
@@ -226,15 +245,17 @@ export default function AdminDashboard({
                                 style={{ gridTemplateColumns: `repeat(${revenueTrend.length}, minmax(0, 1fr))` }}
                             >
                                 {revenueTrend.map((point, index) => {
-                                    const label = period === 'daily'
-                                        ? `${point.label}:00`
+                                    const label = period === 'weekly'
+                                        ? new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(
+                                              new Date(`${point.label}T12:00:00Z`),
+                                          )
                                         : period === 'monthly'
                                           ? point.label
                                           : new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(
                                                 new Date(Date.UTC(Number(point.date.slice(0, 4)), Number(point.label) - 1, 15)),
                                             );
                                     const showLabel = period === 'yearly'
-                                        || (period === 'daily' && index % 4 === 0)
+                                        || (period === 'weekly')
                                         || (period === 'monthly' && (index % 5 === 0 || index === revenueTrend.length - 1));
                                     const barHeight = Math.max(
                                         (point.revenue / maxRevenue) * 100,

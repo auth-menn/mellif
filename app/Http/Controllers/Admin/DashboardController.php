@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,38 +18,34 @@ class DashboardController extends Controller
     {
         $today = today();
         $period = $request->query('period', 'monthly');
-        if (! in_array($period, ['daily', 'monthly', 'yearly'], true)) {
+        if (! in_array($period, ['weekly', 'monthly', 'yearly'], true)) {
             $period = 'monthly';
         }
 
         $periodStart = match ($period) {
-            'daily' => $today->copy()->startOfDay(),
+            'weekly' => $today->copy()->startOfWeek(Carbon::MONDAY),
             'yearly' => $today->copy()->startOfYear(),
             default => $today->copy()->startOfMonth(),
         };
         $periodEnd = match ($period) {
-            'daily' => $today->copy()->endOfDay(),
+            'weekly' => $today->copy()->endOfWeek(Carbon::SUNDAY),
             'yearly' => $today->copy()->endOfYear(),
             default => $today->copy()->endOfMonth(),
         };
         $bucketExpression = match (Order::query()->getConnection()->getDriverName()) {
             'sqlite' => match ($period) {
-                'daily' => "CAST(strftime('%H', created_at) AS INTEGER)",
                 'yearly' => "CAST(strftime('%m', created_at) AS INTEGER)",
                 default => 'DATE(created_at)',
             },
             'pgsql' => match ($period) {
-                'daily' => 'EXTRACT(HOUR FROM created_at)::integer',
                 'yearly' => 'EXTRACT(MONTH FROM created_at)::integer',
                 default => 'DATE(created_at)',
             },
             'sqlsrv' => match ($period) {
-                'daily' => 'DATEPART(HOUR, created_at)',
                 'yearly' => 'DATEPART(MONTH, created_at)',
                 default => 'CAST(created_at AS date)',
             },
             default => match ($period) {
-                'daily' => 'HOUR(created_at)',
                 'yearly' => 'MONTH(created_at)',
                 default => 'DATE(created_at)',
             },
@@ -61,7 +58,7 @@ class DashboardController extends Controller
             ->get()
             ->keyBy(fn ($record): string => (string) $record->bucket);
         $periodCount = match ($period) {
-            'daily' => 24,
+            'weekly' => 7,
             'yearly' => 12,
             default => $today->daysInMonth,
         };
@@ -85,12 +82,12 @@ class DashboardController extends Controller
             ],
             'revenueTrend' => collect(range(0, $periodCount - 1))->map(function (int $index) use ($period, $today, $revenueBuckets): array {
                 $date = match ($period) {
-                    'daily' => $today->copy()->startOfDay()->addHours($index),
+                    'weekly' => $today->copy()->startOfWeek(Carbon::MONDAY)->addDays($index),
                     'yearly' => $today->copy()->startOfYear()->addMonths($index),
                     default => $today->copy()->startOfMonth()->addDays($index),
                 };
                 $bucket = match ($period) {
-                    'daily', 'yearly' => (string) ($index + ($period === 'yearly' ? 1 : 0)),
+                    'yearly' => (string) ($index + 1),
                     default => $date->toDateString(),
                 };
                 $record = $revenueBuckets->get($bucket);
@@ -98,7 +95,7 @@ class DashboardController extends Controller
                 return [
                     'date' => $date->toIso8601String(),
                     'label' => match ($period) {
-                        'daily' => $date->format('H'),
+                        'weekly' => $date->toDateString(),
                         'yearly' => $date->format('n'),
                         default => $date->format('j'),
                     },
