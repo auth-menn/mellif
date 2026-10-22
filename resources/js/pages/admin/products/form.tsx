@@ -21,7 +21,8 @@ type EditableProduct = {
     variants: StoreVariant[];
     images: ExistingImage[];
 };
-type VariantInput = { size: string; stock: string };
+type VariantInput = { key: string; size: string; stock: string };
+type NewVariantInput = Omit<VariantInput, 'key'>;
 
 function normalizeStock(value: string): string {
     return value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
@@ -243,10 +244,11 @@ export default function ProductForm({
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleteProcessing, setDeleteProcessing] = useState(false);
-    const [newVariant, setNewVariant] = useState<VariantInput>({
+    const [newVariant, setNewVariant] = useState<NewVariantInput>({
         size: '',
         stock: '',
     });
+    const nextVariantKey = useRef(1);
     const [newImagePreviews, setNewImagePreviews] = useState<
         { file: File; url: string }[]
     >([]);
@@ -268,9 +270,10 @@ export default function ProductForm({
         is_active: product?.is_active ?? true,
         is_featured: product?.is_featured ?? false,
         variants: product?.variants.map((variant: StoreVariant) => ({
+            key: `saved-${variant.id}`,
             size: variant.size,
             stock: String(variant.stock),
-        })) ?? [{ size: 'M', stock: '' }],
+        })) ?? [{ key: 'new-0', size: 'M', stock: '' }],
         images: [] as File[],
         image_orders: [] as number[],
         sync_existing_images: product !== null,
@@ -295,7 +298,7 @@ export default function ProductForm({
             discount_percent:
                 data.discount_percent === '' ? null : data.discount_percent,
             variants: data.variants.map((variant) => ({
-                ...variant,
+                size: variant.size,
                 stock: variant.stock === '' ? '' : Number(variant.stock),
             })),
             _method: product ? 'put' : 'post',
@@ -575,7 +578,7 @@ export default function ProductForm({
                     <div className="space-y-2">
                         {form.data.variants.map((variant, index) => (
                             <div
-                                key={`${variant.size}-${index}`}
+                                key={variant.key}
                                 className="flex gap-2"
                             >
                                 <input
@@ -674,7 +677,10 @@ export default function ProductForm({
                                 if (newVariant.size.trim()) {
                                     form.setData('variants', [
                                         ...form.data.variants,
-                                        newVariant,
+                                        {
+                                            ...newVariant,
+                                            key: `new-${nextVariantKey.current++}`,
+                                        },
                                     ]);
                                     setNewVariant({ size: '', stock: '' });
                                 }
