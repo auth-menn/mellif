@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { ArrowLeft, Home, LayoutDashboard, Package, Tags, ShoppingCart, Truck, Settings } from 'lucide-react';
+import { ArrowLeft, Home, LayoutDashboard, Package, Tags, ShoppingCart, Truck, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import adminRoutes from '@/routes/admin';
 import { useTranslation } from '@/hooks/use-translation';
@@ -13,6 +13,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         { label: t('admin.products'), href: adminRoutes.products.index.url(), icon: Package },
         { label: t('admin.categories'), href: adminRoutes.categories.index.url(), icon: Tags },
         { label: t('admin.orders'), href: adminRoutes.orders.index.url(), icon: ShoppingCart },
+        { label: t('admin.users'), href: adminRoutes.users.index.url(), icon: Users },
         { label: t('admin.shipping'), href: adminRoutes.shipping.index.url(), icon: Truck },
         { label: t('admin.homeSettings'), href: adminRoutes.homeSettings.edit.url(), icon: Settings },
     ];
@@ -41,6 +42,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         backHref = adminRoutes.orders.index.url();
     } else if (currentPath.startsWith('/admin/orders')) {
         pageTitle = t('admin.orders');
+        backHref = adminRoutes.dashboard.url();
+    } else if (currentPath.startsWith('/admin/users')) {
+        pageTitle = t('admin.users');
+        pageSection = t('admin.userMonitoring');
         backHref = adminRoutes.dashboard.url();
     } else if (currentPath.startsWith('/admin/shipping')) {
         pageTitle = t('admin.shipping');

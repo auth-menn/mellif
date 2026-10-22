@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\HomeSettingsController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ShippingCourierController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
@@ -70,6 +71,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::patch('orders/{order}', [OrderController::class, 'update'])->name('orders.update');
+    Route::get('users', [UserController::class, 'index'])->name('users.index');
     Route::get('home-settings', [HomeSettingsController::class, 'edit'])->name('home-settings.edit');
     Route::put('home-settings', [HomeSettingsController::class, 'update'])->name('home-settings.update');
 });
