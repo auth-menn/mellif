@@ -86,6 +86,28 @@ function digitsOnly(value: string): string {
     return value.replace(/\D/g, '');
 }
 
+function downloadQrisImage(imageDataUrl: string, orderNumber: string): void {
+    const [metadata, encodedImage] = imageDataUrl.split(',', 2);
+    const imageContent = metadata.includes(';base64')
+        ? Uint8Array.from(atob(encodedImage), (character) =>
+              character.charCodeAt(0),
+          )
+        : decodeURIComponent(encodedImage);
+    const imageType = metadata.match(/^data:([^;]+)/)?.[1] ?? 'image/svg+xml';
+    const imageUrl = URL.createObjectURL(
+        new Blob([imageContent], { type: imageType }),
+    );
+    const downloadLink = document.createElement('a');
+
+    downloadLink.href = imageUrl;
+    downloadLink.download = `QRIS-${orderNumber}.svg`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+
+    window.setTimeout(() => URL.revokeObjectURL(imageUrl), 1000);
+}
+
 export default function Checkout({
     paymentMethods,
     order,
@@ -699,11 +721,11 @@ export default function Checkout({
                                 !isQrisExpired ? (
                                     <div className="qris-dialog-code flex flex-col items-center gap-2">
                                         {order.qrisImage && (
-                                            <img
-                                                src={order.qrisImage}
-                                                alt={t('checkout.qrisPayment')}
-                                                className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
-                                            />
+                                        <img
+                                            src={order.qrisImage}
+                                            alt={t('checkout.qrisPayment')}
+                                            className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
+                                        />
                                         )}
                                         {qrisSecondsRemaining !== null && (
                                             <p
@@ -1258,20 +1280,11 @@ export default function Checkout({
                         !isQrisExpired ? (
                             <div className="qris-dialog-code flex flex-col items-center gap-2">
                                 {order.qrisImage && (
-                                    <>
-                                        <img
-                                            src={order.qrisImage}
-                                            alt={t('checkout.qrisPayment')}
-                                            className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
-                                        />
-                                        <a
-                                            href={order.qrisImage}
-                                            download={`QRIS-${order.orderNumber}.svg`}
-                                            className="border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100"
-                                        >
-                                            {t('checkout.downloadQris')}
-                                        </a>
-                                    </>
+                                            <img
+                                                src={order.qrisImage}
+                                                alt={t('checkout.qrisPayment')}
+                                                className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
+                                            />
                                 )}
                                 {qrisSecondsRemaining !== null && (
                                     <p
@@ -1342,11 +1355,28 @@ export default function Checkout({
                         <div className="qris-dialog-info space-y-1 rounded-lg bg-neutral-50 px-3 py-2 text-center text-xs leading-5 text-neutral-500">
                             <p>{t('checkout.paymentStatusAuto')}</p>
                         </div>
-                        <DialogFooter className="qris-dialog-footer border-t border-neutral-200 pt-2">
+                        <DialogFooter className="qris-dialog-footer grid grid-cols-2 border-t border-neutral-200 pt-2">
+                            {order.hasQris &&
+                                paymentStatus === 'unpaid' &&
+                                !isQrisExpired &&
+                                order.qrisImage && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            downloadQrisImage(
+                                                order.qrisImage!,
+                                                order.orderNumber,
+                                            )
+                                        }
+                                        className="min-h-11 touch-manipulation border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100"
+                                    >
+                                        {t('checkout.downloadQris')}
+                                    </button>
+                                )}
                             <button
                                 type="button"
                                 onClick={() => setQrisModalOpen(false)}
-                                className="w-full border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                                className={`min-h-11 touch-manipulation border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50 ${order.hasQris && paymentStatus === 'unpaid' && !isQrisExpired && order.qrisImage ? '' : 'col-span-2'}`}
                             >
                                 {t('common.close')}
                             </button>
