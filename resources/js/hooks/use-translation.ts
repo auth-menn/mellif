@@ -188,6 +188,9 @@ const messages = {
         'checkout.noShipping': 'Ekspedisi / ongkir',
         'checkout.total': 'Total',
         'checkout.placeOrder': 'Order Sekarang',
+        'checkout.captchaInstruction': 'Selesaikan verifikasi keamanan sebelum melanjutkan pembayaran.',
+        'checkout.captchaUnavailable': 'Verifikasi keamanan gagal dimuat. Muat ulang halaman dan coba lagi.',
+        'checkout.captchaRequired': 'Selesaikan verifikasi',
         'checkout.accepted': 'Pesanan diterima',
         'checkout.thanks': 'Terima kasih sudah berbelanja.',
         'checkout.orderNumber': 'Nomor order Anda',
@@ -207,6 +210,7 @@ const messages = {
             'QRIS sudah kedaluwarsa. Generate QRIS baru untuk melanjutkan pembayaran.',
         'checkout.qrisInstructions':
             'Pindai QR ini melalui aplikasi pembayaran untuk melanjutkan.',
+        'checkout.downloadQris': 'Unduh QRIS',
         'checkout.copyQris': 'Salin kode QRIS',
         'checkout.qrisCopied': 'Kode QRIS tersalin',
         'checkout.qrisGenerateFailed':
@@ -602,6 +606,9 @@ const messages = {
         'checkout.noShipping': 'Courier / shipping fee',
         'checkout.total': 'Total',
         'checkout.placeOrder': 'Place order',
+        'checkout.captchaInstruction': 'Complete the security check before continuing to payment.',
+        'checkout.captchaUnavailable': 'The security check could not load. Refresh the page and try again.',
+        'checkout.captchaRequired': 'Complete verification',
         'checkout.accepted': 'Order received',
         'checkout.thanks': 'Thank you for shopping with us.',
         'checkout.orderNumber': 'Your order number',
@@ -621,6 +628,7 @@ const messages = {
             'This QRIS has expired. Generate a new QRIS to continue payment.',
         'checkout.qrisInstructions':
             'Scan this QR with your payment app to continue.',
+        'checkout.downloadQris': 'Download QRIS',
         'checkout.copyQris': 'Copy QRIS code',
         'checkout.qrisCopied': 'QRIS code copied',
         'checkout.qrisGenerateFailed':

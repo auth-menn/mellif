@@ -11,6 +11,7 @@ import {
 } from '@/routes/shipping';
 import { index as shopIndex } from '@/routes/shop';
 import AuthModal from '@/components/store/auth-modal';
+import TurnstileWidget from '@/components/store/turnstile-widget';
 import {
     Dialog,
     DialogContent,
@@ -88,9 +89,11 @@ function digitsOnly(value: string): string {
 export default function Checkout({
     paymentMethods,
     order,
+    turnstileSiteKey,
 }: {
     paymentMethods: PaymentMethod[];
     order: CheckoutOrder | null;
+    turnstileSiteKey: string | null;
 }) {
     const { props } = usePage();
     const { t } = useTranslation();
@@ -128,6 +131,8 @@ export default function Checkout({
     const [cartMessage, setCartMessage] = useState('');
     const [orderConfirmOpen, setOrderConfirmOpen] = useState(false);
     const [orderSubmitting, setOrderSubmitting] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+    const [turnstileAttempt, setTurnstileAttempt] = useState(0);
     const [keepCheckoutVisible, setKeepCheckoutVisible] = useState(false);
     const [qrisModalOpen, setQrisModalOpen] = useState(Boolean(order));
     const [paymentStatus, setPaymentStatus] =
@@ -417,6 +422,9 @@ export default function Checkout({
                       }
                     : {}),
                 payment_method_id: paymentId,
+                ...(turnstileSiteKey && turnstileToken
+                    ? { turnstile_token: turnstileToken }
+                    : {}),
                 items: cart.map((line) => ({
                     variant_id: line.variant.id,
                     qty: line.quantity,
@@ -426,8 +434,14 @@ export default function Checkout({
                 preserveState: true,
                 preserveScroll: true,
                 onStart: () => setOrderSubmitting(true),
-                onError: (responseErrors) =>
-                    setErrors(responseErrors as Record<string, string>),
+                onError: (responseErrors) => {
+                    setErrors(responseErrors as Record<string, string>);
+                    if (turnstileSiteKey) {
+                        setTurnstileToken(null);
+                        setTurnstileAttempt((attempt) => attempt + 1);
+                        setOrderConfirmOpen(true);
+                    }
+                },
                 onSuccess: () => {
                     if (selectedPaymentMethod?.code === 'qris') {
                         setKeepCheckoutVisible(true);
@@ -1247,11 +1261,20 @@ export default function Checkout({
                         !isQrisExpired ? (
                             <div className="qris-dialog-code flex flex-col items-center gap-2">
                                 {order.qrisImage && (
-                                    <img
-                                        src={order.qrisImage}
-                                        alt={t('checkout.qrisPayment')}
-                                        className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
-                                    />
+                                    <>
+                                        <img
+                                            src={order.qrisImage}
+                                            alt={t('checkout.qrisPayment')}
+                                            className="size-64 max-h-[min(64vw,42dvh)] max-w-[min(64vw,42dvh)] rounded border border-neutral-200 bg-white p-2"
+                                        />
+                                        <a
+                                            href={order.qrisImage}
+                                            download={`QRIS-${order.orderNumber}.svg`}
+                                            className="border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100"
+                                        >
+                                            {t('checkout.downloadQris')}
+                                        </a>
+                                    </>
                                 )}
                                 {qrisSecondsRemaining !== null && (
                                     <p
@@ -1450,6 +1473,22 @@ export default function Checkout({
                             </div>
                         ))}
                     </div>
+                    {turnstileSiteKey && (
+                        <div className="shrink-0 border-t border-neutral-200 pt-3">
+                            <TurnstileWidget
+                                key={turnstileAttempt}
+                                siteKey={turnstileSiteKey}
+                                onTokenChange={setTurnstileToken}
+                                instruction={t('checkout.captchaInstruction')}
+                                errorMessage={t('checkout.captchaUnavailable')}
+                            />
+                            {errors.turnstile_token && !turnstileToken && (
+                                <p className="mt-1 text-xs text-red-700" role="alert">
+                                    {errors.turnstile_token}
+                                </p>
+                            )}
+                        </div>
+                    )}
                     <div className="shrink-0 space-y-2 border-t border-neutral-200 pt-4 text-sm">
                         <p className="flex justify-between">
                             <span>{t('checkout.subtotal')}</span>
@@ -1479,13 +1518,18 @@ export default function Checkout({
                         </button>
                         <button
                             type="button"
-                            disabled={orderSubmitting}
+                            disabled={
+                                orderSubmitting ||
+                                (Boolean(turnstileSiteKey) && !turnstileToken)
+                            }
                             onClick={confirmCheckout}
                             className="w-full bg-black px-5 py-3 text-sm text-white hover:bg-neutral-800 disabled:opacity-50 sm:w-auto"
                         >
                             {orderSubmitting
                                 ? t('checkout.processing')
-                                : t('checkout.continueToPayment')}
+                                : turnstileSiteKey && !turnstileToken
+                                  ? t('checkout.captchaRequired')
+                                  : t('checkout.continueToPayment')}
                         </button>
                     </DialogFooter>
                 </DialogContent>

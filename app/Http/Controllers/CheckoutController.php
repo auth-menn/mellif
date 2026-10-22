@@ -14,6 +14,7 @@ use App\Services\QrislyService;
 use App\Services\QrisPaymentSettlement;
 use App\Services\ShippingRateException;
 use App\Services\ShippingRateService;
+use App\Services\TurnstileService;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
@@ -48,6 +49,10 @@ class CheckoutController extends Controller
                 ->where('is_active', true)
                 ->where('code', 'qris')
                 ->get(['id', 'name', 'code']),
+            'turnstileSiteKey' => filled(config('services.turnstile.site_key'))
+                && filled(config('services.turnstile.secret_key'))
+                    ? config('services.turnstile.site_key')
+                    : null,
             'order' => $order ? [
                 'id' => $order->id,
                 'orderNumber' => $order->order_number,
@@ -80,9 +85,18 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function store(PlaceOrderRequest $request, ShippingRateService $shippingRates, CheckoutItemsService $checkoutItems, QrislyService $qrisly): RedirectResponse
+    public function store(PlaceOrderRequest $request, ShippingRateService $shippingRates, CheckoutItemsService $checkoutItems, QrislyService $qrisly, TurnstileService $turnstile): RedirectResponse
     {
         $data = $request->validated();
+
+        if (filled(config('services.turnstile.site_key'))
+            && filled(config('services.turnstile.secret_key'))
+            && ! $turnstile->verify($data['turnstile_token'], $request->ip())) {
+            throw ValidationException::withMessages([
+                'turnstile_token' => 'Verifikasi keamanan gagal atau kedaluwarsa. Silakan verifikasi ulang.',
+            ]);
+        }
+
         $items = collect($data['items']);
         ['variants' => $rateVariants, 'quantities' => $quantitiesByVariant] = $checkoutItems->resolve($data['items']);
         $isDirectCod = $data['delivery_method'] === 'direct_cod';

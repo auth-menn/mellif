@@ -41,6 +41,9 @@ class PlaceOrderRequest extends FormRequest
                 : ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9 <>\-\/]+$/'],
             'expected_shipping_cost' => [$isDirectCod ? 'nullable' : 'required', 'integer', 'min:0'],
             'payment_method_id' => ['required', Rule::exists('payment_methods', 'id')->where('code', 'qris')->where('is_active', true)],
+            'turnstile_token' => $this->turnstileEnabled()
+                ? ['required', 'string', 'max:2048']
+                : ['nullable', 'string', 'max:2048'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.variant_id' => ['required', 'integer', 'min:1'],
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:99'],
@@ -54,5 +57,11 @@ class PlaceOrderRequest extends FormRequest
             'delivery_method' => $this->input('delivery_method', 'courier'),
             'destination_label' => is_string($label) ? mb_substr(trim(strip_tags($label)), 0, 255) : '',
         ]);
+    }
+
+    private function turnstileEnabled(): bool
+    {
+        return filled(config('services.turnstile.site_key'))
+            && filled(config('services.turnstile.secret_key'));
     }
 }

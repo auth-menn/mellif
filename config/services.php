@@ -38,6 +38,11 @@ return [
         'webhook_token' => env('QRISLY_WEBHOOK_TOKEN'),
     ],
 
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'mellif' => [
         'admin_email' => env('ADMIN_EMAIL'),
         'admin_password' => env('ADMIN_PASSWORD'),
