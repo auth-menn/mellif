@@ -103,7 +103,14 @@ class ShippingRateService
             });
         });
 
-        return collect($rates)->reject(function (array $rate): bool {
+        $allowedServices = config('shipping.allowed_services', []);
+
+        return collect($rates)->filter(function (array $rate) use ($allowedServices): bool {
+            $services = $allowedServices[$rate['code']] ?? [];
+            $services = array_map(fn (string $service): string => strtoupper(trim($service)), $services);
+
+            return in_array(strtoupper(trim($rate['service'])), $services, true);
+        })->reject(function (array $rate): bool {
             $filters = config('shipping.excluded_services');
 
             foreach ($filters['service_prefixes'] as $prefix) {
