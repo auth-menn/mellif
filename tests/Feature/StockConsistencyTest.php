@@ -140,12 +140,12 @@ describe('checkout stock consistency', function () {
         $context['payment'] = PaymentMethod::query()->create([
             'name' => 'QRIS', 'code' => 'qris', 'is_active' => true,
         ]);
-        $product = makeStockConsistencyProduct();
+        $product = makeStockConsistencyProduct(price: 45000);
         $variant = makeStockConsistencyVariant($product, 5);
         CartItem::query()->create([
             'user_id' => $context['user']->id,
             'product_variant_id' => $variant->id,
-            'quantity' => 1,
+            'quantity' => 3,
         ]);
 
         config([
@@ -158,16 +158,16 @@ describe('checkout stock consistency', function () {
                 'meta' => ['status' => 'success', 'code' => 200],
                 'data' => [
                     'history_id' => 12345,
-                    'qris_string' => '0002010102112661006299VALID_QRIS540410016304E8E2',
-                    'original_amount' => 100000,
-                    'final_amount' => 100000,
+                    'qris_string' => qrisPayloadWithAmount(135001),
+                    'original_amount' => 135000,
+                    'final_amount' => 135001,
                     'payment_status' => 'unpaid',
                     'expiry_time' => '2026-10-18 12:00:00',
                 ],
             ]),
         ]);
         $payload = stockConsistencyCheckoutPayload($context, [
-            ['variant_id' => $variant->id, 'qty' => 1],
+            ['variant_id' => $variant->id, 'qty' => 3],
         ]);
         $payload['delivery_method'] = 'direct_cod';
         unset(
@@ -191,16 +191,22 @@ describe('checkout stock consistency', function () {
             'destination_id' => null,
             'destination_label' => 'COD',
             'shipping_service' => null,
-            'total' => 100000,
+            'subtotal' => 135000,
+            'total' => 135000,
             'stock_deducted' => false,
             'qrisly_history_id' => 12345,
-            'qris_original_amount' => 100000,
-            'qris_final_amount' => 100000,
+            'qris_original_amount' => 135000,
+            'qris_final_amount' => 135001,
             'qris_payment_status' => 'unpaid',
+        ]);
+        $this->assertDatabaseHas('order_items', [
+            'product_id' => $product->id,
+            'qty' => 3,
+            'unit_price' => 45000,
         ]);
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'calculate/domestic-cost'));
         Http::assertSent(fn ($request): bool => str_contains($request->url(), 'generate-qris')
-            && $request['amount'] === 100000);
+            && $request['amount'] === 135000);
         expect($variant->fresh()->stock)->toBe(5)
             ->and($context['user']->cartItems()->count())->toBe(1);
     });

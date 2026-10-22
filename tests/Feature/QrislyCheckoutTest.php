@@ -91,7 +91,7 @@ it('generates a replacement QRIS for an expired order', function () {
             'meta' => ['status' => 'success', 'code' => 200],
             'data' => [
                 'history_id' => 8760,
-                'qris_string' => 'replacement-qris-payload',
+                'qris_string' => qrisPayloadWithAmount(118002),
                 'original_amount' => 118000,
                 'final_amount' => 118002,
                 'payment_status' => 'unpaid',
@@ -128,7 +128,7 @@ it('generates a replacement QRIS for an expired order', function () {
     $this->assertDatabaseHas('orders', [
         'id' => $order->id,
         'qrisly_history_id' => 8760,
-        'qris_string' => 'replacement-qris-payload',
+        'qris_string' => qrisPayloadWithAmount(118002),
         'qris_final_amount' => 118002,
         'qris_payment_status' => 'unpaid',
     ]);
@@ -202,7 +202,7 @@ it('accepts the provider unique amount while preserving the order base amount', 
             'meta' => ['status' => 'success', 'code' => 200],
             'data' => [
                 'history_id' => 8762,
-                'qris_string' => 'VALID_QRIS_PAYLOAD',
+                'qris_string' => qrisPayloadWithAmount(100001),
                 'original_amount' => 100000,
                 'final_amount' => 100001,
                 'payment_status' => 'unpaid',
@@ -222,7 +222,7 @@ it('accepts the provider unique amount while preserving the order base amount', 
         'id' => $context['order']->id,
         'qris_payment_status' => 'unpaid',
         'qris_final_amount' => 100001,
-        'qris_string' => 'VALID_QRIS_PAYLOAD',
+        'qris_string' => qrisPayloadWithAmount(100001),
     ]);
 });
 
@@ -256,6 +256,45 @@ it('rejects a QRIS response when its original amount does not match the order', 
         ->post(route('checkout.orders.qris.regenerate', $context['order']))
         ->assertRedirect(route('checkout.show'));
 
+    $this->assertDatabaseHas('orders', [
+        'id' => $context['order']->id,
+        'qris_payment_status' => 'failed',
+        'qris_string' => null,
+    ]);
+});
+
+it('rejects a QR payload whose encoded amount differs from the provider final amount', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-PAYLOAD-AMOUNT-MISMATCH');
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/8759' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['payment_status' => 'expired'],
+        ]),
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => [
+                'history_id' => 8764,
+                'qris_string' => qrisPayloadWithAmount(45000),
+                'original_amount' => 100000,
+                'final_amount' => 100001,
+                'payment_status' => 'unpaid',
+                'expiry_time' => now()->addMinutes(10)->toDateTimeString(),
+            ],
+        ]),
+    ]);
+
+    $this->actingAs($context['owner'])
+        ->post(route('checkout.orders.qris.regenerate', $context['order']))
+        ->assertRedirect(route('checkout.show'));
+
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/generate-qris')
+        && $request['amount'] === 100000);
     $this->assertDatabaseHas('orders', [
         'id' => $context['order']->id,
         'qris_payment_status' => 'failed',
@@ -370,7 +409,7 @@ it('limits QRIS regeneration to three attempts per order', function () {
                 'meta' => ['status' => 'success', 'code' => 200],
                 'data' => [
                     'history_id' => $generatedHistoryId++,
-                    'qris_string' => 'VALID_QRIS_PAYLOAD',
+                    'qris_string' => qrisPayloadWithAmount(100001),
                     'original_amount' => 100000,
                     'final_amount' => 100001,
                     'payment_status' => 'unpaid',

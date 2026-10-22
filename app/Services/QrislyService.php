@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Support\QrisInspector;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -52,6 +53,12 @@ class QrislyService
 
         if (! is_string($data['qris_string']) || trim($data['qris_string']) === '' || str_contains($data['qris_string'], 'INVALID_DATA')) {
             throw new RuntimeException('QRISLY returned an unusable QRIS payload.');
+        }
+
+        $qrisFields = QrisInspector::parseTlv($data['qris_string']);
+        $qrisAmount = $qrisFields['54'] ?? null;
+        if (! is_string($qrisAmount) || ! is_numeric($qrisAmount) || abs((float) $qrisAmount - $finalAmount) >= 0.01) {
+            throw new RuntimeException('QRIS payload amount does not match provider final amount.');
         }
 
         return [

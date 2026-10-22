@@ -409,6 +409,7 @@ class CheckoutController extends Controller
                 'QRISLY returned an invalid QRIS response.' => 'invalid_provider_response',
                 'QRISLY returned an amount that does not match the order total.' => 'amount_mismatch',
                 'QRISLY returned an unusable QRIS payload.' => 'invalid_qris_payload',
+                'QRIS payload amount does not match provider final amount.' => 'qris_payload_amount_mismatch',
                 default => 'runtime_exception',
             };
         }

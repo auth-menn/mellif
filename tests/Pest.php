@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\QrisInspector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,4 +48,26 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+function qrisPayloadWithAmount(int $amount): string
+{
+    $fields = [
+        '00' => '01',
+        '01' => '12',
+        '53' => '360',
+        '54' => (string) $amount,
+        '58' => 'ID',
+        '59' => 'MELLIF',
+        '60' => 'GRESIK',
+    ];
+    $payload = '';
+
+    foreach ($fields as $tag => $value) {
+        $payload .= $tag.str_pad((string) strlen($value), 2, '0', STR_PAD_LEFT).$value;
+    }
+
+    $payload .= '6304';
+
+    return $payload.QrisInspector::crc16($payload);
 }

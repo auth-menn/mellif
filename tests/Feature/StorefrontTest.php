@@ -114,7 +114,7 @@ it('creates an order with server prices without reducing stock before QRIS payme
             'meta' => ['message' => 'QRIS successfully generated', 'code' => 200, 'status' => 'success'],
             'data' => [
                 'history_id' => 8759,
-                'qris_string' => '0002010102112661006299VALID_QRIS_PAYLOAD540410016304E8E2',
+                'qris_string' => qrisPayloadWithAmount(318001),
                 'original_amount' => 318000,
                 'final_amount' => 318001,
                 'payment_status' => 'unpaid',
