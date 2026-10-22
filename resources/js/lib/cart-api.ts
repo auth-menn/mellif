@@ -10,6 +10,7 @@ export type CartOrderSummary = {
     createdAt: string | null;
     items: {
         productName: string;
+        imageUrl: string | null;
         size: string;
         quantity: number;
         unitPrice: number;

@@ -19,7 +19,7 @@ class CartController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $orderItems = 'items:id,order_id,product_name,size,qty,unit_price';
+        $orderItems = ['items:id,order_id,product_id,product_name,size,qty,unit_price', 'items.product.images'];
 
         return response()->json([
             'items' => $this->cartItems($user),
@@ -164,12 +164,17 @@ class CartController extends Controller
             'status' => $order->status,
             'paymentStatus' => $order->qris_payment_status,
             'createdAt' => $order->created_at?->toIso8601String(),
-            'items' => $order->items->map(fn ($item): array => [
-                'productName' => $item->product_name,
-                'size' => $item->size,
-                'quantity' => $item->qty,
-                'unitPrice' => $item->unit_price,
-            ])->all(),
+            'items' => $order->items->map(function ($item): array {
+                $image = $item->product?->images->first();
+
+                return [
+                    'productName' => $item->product_name,
+                    'imageUrl' => $image ? asset('storage/'.$image->path) : null,
+                    'size' => $item->size,
+                    'quantity' => $item->qty,
+                    'unitPrice' => $item->unit_price,
+                ];
+            })->all(),
         ])->all();
     }
 

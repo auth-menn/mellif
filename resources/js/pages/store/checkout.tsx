@@ -81,6 +81,10 @@ function xsrfToken(): string {
     return token ? decodeURIComponent(token) : '';
 }
 
+function digitsOnly(value: string): string {
+    return value.replace(/\D/g, '');
+}
+
 export default function Checkout({
     paymentMethods,
     order,
@@ -115,7 +119,7 @@ export default function Checkout({
     const requiresShipping = !isDirectCod;
     const [form, setForm] = useState({
         recipient_name: user?.name ?? '',
-        phone: user?.phone ?? '',
+        phone: digitsOnly(user?.phone ?? ''),
         address: user?.address ?? '',
         address_detail: user?.address_detail ?? '',
     });
@@ -232,7 +236,7 @@ export default function Checkout({
         if (!user) return;
         setForm((current) => ({
             recipient_name: current.recipient_name || user.name,
-            phone: current.phone || user.phone || '',
+            phone: current.phone || digitsOnly(user.phone || ''),
             address: current.address || user.address || '',
             address_detail: current.address_detail || user.address_detail || '',
         }));
@@ -842,11 +846,17 @@ export default function Checkout({
                                 ) : (
                                     <input
                                         required
+                                        type={key === 'phone' ? 'tel' : 'text'}
+                                        inputMode={key === 'phone' ? 'numeric' : undefined}
+                                        pattern={key === 'phone' ? '[0-9]*' : undefined}
                                         value={form[key]}
                                         onChange={(event) =>
                                             setForm({
                                                 ...form,
-                                                [key]: event.target.value,
+                                                [key]:
+                                                    key === 'phone'
+                                                        ? digitsOnly(event.target.value)
+                                                        : event.target.value,
                                             })
                                         }
                                         className="mt-2 w-full border border-neutral-300 px-3 py-3"

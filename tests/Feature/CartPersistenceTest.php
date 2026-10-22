@@ -4,6 +4,7 @@ use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Models\User;
 
@@ -94,6 +95,11 @@ it('shows this user their unpaid orders and paid product history in the cart', f
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
     $variant = createCartVariant();
+    ProductImage::query()->create([
+        'product_id' => $variant->product_id,
+        'path' => 'products/everyday-tee.jpg',
+        'sort_order' => 0,
+    ]);
     createCartHistoryOrder($user, $variant, 'MLF-CART-UNPAID', 'unpaid');
     createCartHistoryOrder($user, $variant, 'MLF-CART-PAID', 'paid');
     createCartHistoryOrder($otherUser, $variant, 'MLF-CART-OTHER', 'paid');
@@ -105,7 +111,8 @@ it('shows this user their unpaid orders and paid product history in the cart', f
         ->assertJsonPath('orders.awaitingPayment.0.items.0.productName', 'Everyday Tee')
         ->assertJsonCount(1, 'orders.paid')
         ->assertJsonPath('orders.paid.0.orderNumber', 'MLF-CART-PAID')
-        ->assertJsonPath('orders.paid.0.items.0.size', 'M');
+        ->assertJsonPath('orders.paid.0.items.0.size', 'M')
+        ->assertJsonPath('orders.paid.0.items.0.imageUrl', asset('storage/products/everyday-tee.jpg'));
 });
 
 it('rejects non-canonical cart quantities with a 422 response', function (mixed $quantity) {
