@@ -48,5 +48,5 @@ it('advertises the production sitemap in the public robots file', function () {
     expect($robotsFile)
         ->toContain('User-agent: *')
         ->toContain('Disallow:')
-        ->toContain('Sitemap: https://www.mellifstudio.com/sitemap.xml');
+        ->toContain('Sitemap: https://mellifstudio.com/sitemap.xml');
 });
