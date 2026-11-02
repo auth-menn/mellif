@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddNoIndexHeader;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -22,7 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['admin' => EnsureUserIsAdmin::class]);
+        $middleware->alias([
+            'admin' => EnsureUserIsAdmin::class,
+            'noindex' => AddNoIndexHeader::class,
+        ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'locale']);
         $middleware->redirectGuestsTo(fn (): string => route('home', ['auth' => 'login'], absolute: false));
 
