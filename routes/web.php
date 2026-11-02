@@ -12,6 +12,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\ShippingController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StorefrontController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
@@ -20,6 +21,7 @@ use Laravel\Fortify\Http\Controllers\NewPasswordController;
 use Laravel\Fortify\Http\Controllers\PasswordResetLinkController;
 
 Route::get('/', [StorefrontController::class, 'home'])->name('home');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/about', [StorefrontController::class, 'about'])->name('about');
 Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
 Route::get('/shop/{product:slug}', [StorefrontController::class, 'product'])->name('shop.show');
@@ -62,7 +64,7 @@ Route::middleware('guest')->prefix('auth/google')->name('google.')->group(functi
     Route::get('/callback', [GoogleController::class, 'callback'])->name('callback');
 });
 
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'admin', 'noindex'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::patch('products/{product}/status', [ProductController::class, 'updateStatus'])->name('products.status');
     Route::resource('products', ProductController::class);
