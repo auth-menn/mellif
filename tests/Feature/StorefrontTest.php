@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Http;
 it('shares a valid English locale cookie with Inertia pages', function () {
     $this->withUnencryptedCookie('locale', 'en')
         ->get(route('home'))
-        ->assertInertia(fn ($page) => $page->where('locale', 'en'))
+        ->assertInertia(fn ($page) => $page
+            ->where('locale', 'en')
+            ->where('canonicalUrl', route('home')))
         ->assertSee('<html lang="en"', false);
 });
 
@@ -41,6 +43,23 @@ it('shows active products in the shop with database prices', function () {
         ->component('store/shop')
         ->where('products.data.0.discounted_price', 150000)
         ->where('products.data.0.stock', 4));
+});
+
+it('provides the canonical URL for an active product page', function () {
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 'canonical-shirts']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Canonical Tee',
+        'slug' => 'canonical-tee',
+        'description' => 'A public product page',
+        'price' => 100000,
+        'is_active' => true,
+    ]);
+
+    $this->get(route('shop.show', ['product' => $product->slug]))
+        ->assertInertia(fn ($page) => $page
+            ->component('store/product')
+            ->where('canonicalUrl', route('shop.show', ['product' => $product->slug])));
 });
 
 it('shows active products with zero stock in the shop and filters them out when in-stock is selected', function () {
