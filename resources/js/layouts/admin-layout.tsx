@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowLeft, Home, LayoutDashboard, Package, Tags, ShoppingCart, Truck, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import adminRoutes from '@/routes/admin';
@@ -56,7 +56,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
 
     return (
-        <div className="admin-theme min-h-screen bg-background pt-[72px] text-foreground md:grid md:grid-cols-[240px_1fr]">
+        <>
+            <Head>
+                <meta name="robots" content="noindex, nofollow" />
+            </Head>
+            <div className="admin-theme min-h-screen bg-background pt-[72px] text-foreground md:grid md:grid-cols-[240px_1fr]">
             <header className="fixed inset-x-0 top-0 z-40 flex h-[72px] items-center justify-between gap-3 border-b border-border bg-card px-3 text-foreground sm:px-5">
                 <div className="flex min-w-0 items-center gap-3">
                     <Link href={backHref} aria-label={t('admin.back')} title={t('admin.back')} className="flex size-10 shrink-0 items-center justify-center border border-border text-foreground hover:bg-muted">
@@ -89,6 +93,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </nav>
             </aside>
             <main className="min-w-0 bg-background p-4 text-foreground sm:p-5 md:p-8">{children}</main>
-        </div>
+            </div>
+        </>
     );
 }
