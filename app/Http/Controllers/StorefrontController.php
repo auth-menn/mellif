@@ -35,6 +35,7 @@ class StorefrontController extends Controller
             'heroImageUrl' => $image ? asset('storage/'.$image) : null,
             'heroVideos' => $heroVideos,
             'productSlides' => $page2Images,
+            'canonicalUrl' => route('home'),
         ]);
     }
 
@@ -170,6 +171,7 @@ class StorefrontController extends Controller
         return Inertia::render('store/product', [
             'product' => $this->productData($product),
             'recommendations' => $recommendations->map(fn (Product $item) => $this->productData($item)),
+            'canonicalUrl' => route('shop.show', ['product' => $product->slug]),
         ]);
     }
 
