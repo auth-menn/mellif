@@ -65,6 +65,7 @@ it('shows confirmed revenue trends and order status totals to admins', function 
 
     $this->actingAs($admin)
         ->get(route('admin.dashboard'))
+        ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
         ->assertInertia(fn ($page) => $page
             ->component('admin/dashboard')
             ->where('stats.revenue_today', 50000)
