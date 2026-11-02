@@ -11,9 +11,35 @@ import { show as checkoutShow } from '@/routes/checkout';
 import { loadServerCart, readGuestCart, saveCartLine } from '@/lib/cart-api';
 import { useTranslation } from '@/hooks/use-translation';
 
-export default function ProductPage({ product, recommendations }: { product: Product; recommendations: Product[] }) {
+export default function ProductPage({ product, recommendations, canonicalUrl }: { product: Product; recommendations: Product[]; canonicalUrl: string }) {
     const { props } = usePage();
     const { t } = useTranslation();
+    const pageTitle = `${product.name} | Mellif Studio`;
+    const pageDescription = product.description.replace(/\s+/g, ' ').trim().slice(0, 160);
+    const productStructuredData = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: product.name,
+        description: product.description,
+        ...(product.images.length > 0 ? { image: product.images } : {}),
+        brand: {
+            '@type': 'Brand',
+            name: 'Mellif Studio',
+        },
+        offers: {
+            '@type': 'Offer',
+            url: canonicalUrl,
+            priceCurrency: 'IDR',
+            price: String(product.discounted_price),
+            availability: product.stock > 0
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock',
+            itemCondition: 'https://schema.org/NewCondition',
+        },
+    })
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026');
     const user = (props.auth as { user?: { id: number } | null } | undefined)?.user;
     const [variant, setVariant] = useState<StoreVariant | null>(null);
     const [quantity, setQuantity] = useState(1);
@@ -91,7 +117,18 @@ export default function ProductPage({ product, recommendations }: { product: Pro
     };
 
     return <>
-        <Head title={`${product.name} | Mellif Studio`} />
+        <Head title={pageTitle}>
+            <meta name="description" content={pageDescription} />
+            <link rel="canonical" href={canonicalUrl} />
+            <meta property="og:type" content="product" />
+            <meta property="og:title" content={pageTitle} />
+            <meta property="og:description" content={pageDescription} />
+            <meta property="og:url" content={canonicalUrl} />
+            {product.images[0] && <meta property="og:image" content={product.images[0]} />}
+            <meta name="twitter:card" content="summary_large_image" />
+            {product.images[0] && <meta name="twitter:image" content={product.images[0]} />}
+            <script type="application/ld+json">{productStructuredData}</script>
+        </Head>
         <main className="mx-auto max-w-[1400px] px-5 pb-20 pt-28 md:px-8">
             <Link href={shopIndex.url()} className="mb-6 inline-flex items-center gap-2 text-sm text-neutral-600 transition-colors hover:text-black">
                 <ArrowLeft size={17} strokeWidth={1.8} />
