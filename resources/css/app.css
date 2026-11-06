@@ -215,6 +215,42 @@
     }
 }
 
+@media (max-width: 767px) {
+    .support-peek-window {
+        width: 58px;
+        height: 91px;
+    }
+
+    .support-peek-wrap:hover .support-peek-window,
+    .support-peek-wrap-open .support-peek-window {
+        width: 86px;
+    }
+
+    .support-peek-svg {
+        width: 96px;
+        height: 91px;
+    }
+
+    .support-peek-trigger {
+        width: 96px;
+        height: 91px;
+    }
+
+    .support-peek-bubble {
+        right: 60px;
+        bottom: 41px;
+        gap: 5px;
+        margin-right: 3px;
+        padding: 6px 9px;
+        font-size: 11px;
+    }
+
+    .support-peek-bubble i {
+        width: 5px;
+        height: 5px;
+    }
+}
+
 .home-carousel-frame {
     aspect-ratio: var(--home-carousel-aspect-ratio, 1);
 }

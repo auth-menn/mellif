@@ -246,7 +246,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
                 <script type="application/ld+json">{websiteStructuredData}</script>
             </Head>
             <main className="overflow-x-clip bg-white">
-                <section className="relative h-[115svh] bg-black sm:h-[120svh] landscape:max-xl:h-[110svh] xl:h-[130svh]" aria-label={t('home.collection')}>
+                <section className="relative h-[100svh] bg-black sm:h-[120svh] landscape:max-xl:h-[100svh] xl:h-[130svh]" aria-label={t('home.collection')}>
                     <div className="sticky top-12 mx-auto h-[calc(100svh-3rem)] w-full sm:top-14 sm:h-[calc(100svh-3.5rem)] md:top-16 md:h-[calc(100svh-4rem)] landscape:max-xl:top-12 landscape:max-xl:h-[calc(100svh-3rem)]">
                         <Link href={shopIndex.url()} aria-label={t('nav.shop')} className="absolute inset-0 z-10 cursor-pointer" />
                         <div ref={heroFrameRef} className="absolute inset-0 overflow-hidden bg-neutral-900 [will-change:clip-path,transform]">

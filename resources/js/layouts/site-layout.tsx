@@ -423,7 +423,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 {supportChatOpen && (
                     <section
                         aria-label={t('support.chatTitle')}
-                        className="support-chatbox-enter absolute right-2 bottom-[119px] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-xl"
+                        className="support-chatbox-enter absolute right-2 bottom-[119px] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-xl max-[767px]:bottom-[96px]"
                     >
                         <div className="flex items-center justify-between bg-[#0b0b0d] px-3 py-2.5 text-white">
                             <div>
