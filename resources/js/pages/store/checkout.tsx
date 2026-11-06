@@ -87,7 +87,7 @@ function digitsOnly(value: string): string {
 }
 
 function qrisCustomerSupportUrl(orderNumber: string): string {
-    const message = `Halo CS, saya sudah melakukan pembayaran QRIS untuk pesanan ${orderNumber}, tetapi status pembayaran belum berubah. Mohon bantu pengecekan.`;
+    const message = `Halo Admin, saya sudah melakukan pembayaran QRIS untuk pesanan ${orderNumber}, tetapi status pembayaran belum berubah. Mohon bantu pengecekan.`;
 
     return `https://wa.me/6281330087106?text=${encodeURIComponent(message)}`;
 }

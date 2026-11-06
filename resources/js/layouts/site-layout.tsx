@@ -451,7 +451,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                                 {t('support.chatDescription')}
                             </p>
                             <a
-                                href="https://wa.me/6281330087106?text=Halo%20CS%2C%20saya%20membutuhkan%20bantuan%20terkait%20pesanan."
+                                href="https://wa.me/6281330087106?text=Halo%20Admin%2C%20saya%20membutuhkan%20bantuan%20terkait%20pesanan."
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#e11d2e] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#bd1424] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e11d2e]"
