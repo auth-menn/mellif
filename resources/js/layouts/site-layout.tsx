@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, Check, House, Info, LoaderCircle, Menu, Search, ShoppingBag, Store, UserRound, X } from 'lucide-react';
+import { ArrowLeft, Check, House, Info, LoaderCircle, Menu, MessageCircle, Search, ShoppingBag, Store, UserRound, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CartLine } from '@/types/store';
 import { money } from '@/types/store';
@@ -38,6 +38,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
     const [logoutProcessing, setLogoutProcessing] = useState(false);
     const [floatingNavbarScrolled, setFloatingNavbarScrolled] = useState(false);
+    const [supportChatOpen, setSupportChatOpen] = useState(false);
     const [languageOpen, setLanguageOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
     const [cart, setCart] = useState<CartLine[]>([]);
@@ -369,6 +370,105 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 onConfirm={() => { void confirmCartRemoval(); }}
             />
             <AuthModal open={authOpen} onOpenChange={setAuthOpen} initialMode={authInitialMode} />
+            <div className="fixed right-0 bottom-5 z-40 sm:bottom-6">
+                {supportChatOpen && (
+                    <section
+                        aria-label={t('support.chatTitle')}
+                        className="absolute right-3 bottom-20 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl"
+                    >
+                        <div className="flex items-center justify-between bg-green-700 px-4 py-3 text-white">
+                            <div>
+                                <p className="text-sm font-semibold">
+                                    {t('support.chatTitle')}
+                                </p>
+                                <p className="mt-0.5 text-xs text-green-50">
+                                    {t('support.chatGreeting')}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                aria-label={t('support.closeChat')}
+                                onClick={() => setSupportChatOpen(false)}
+                                className="rounded-full p-1.5 transition-colors hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="space-y-4 p-4">
+                            <p className="rounded-xl rounded-tl-sm bg-neutral-100 px-3 py-2.5 text-sm leading-5 text-neutral-700">
+                                {t('support.chatDescription')}
+                            </p>
+                            <a
+                                href="https://wa.me/6281330087106?text=Halo%20CS%2C%20saya%20membutuhkan%20bantuan%20terkait%20pesanan."
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800"
+                            >
+                                <MessageCircle size={17} />
+                                {t('support.whatsappCta')}
+                            </a>
+                        </div>
+                    </section>
+                )}
+                {!supportChatOpen && (
+                    <div className="absolute right-[4.5rem] bottom-3 whitespace-nowrap rounded-xl rounded-br-sm bg-white px-3 py-2 text-xs font-medium text-neutral-800 shadow-lg ring-1 ring-black/5">
+                        {t('support.peekPrompt')}
+                    </div>
+                )}
+                <button
+                    type="button"
+                    aria-label={
+                        supportChatOpen
+                            ? t('support.closeChat')
+                            : t('support.openChat')
+                    }
+                    aria-expanded={supportChatOpen}
+                    onClick={() => setSupportChatOpen((open) => !open)}
+                    className="relative flex h-[4.5rem] w-[4.25rem] touch-manipulation items-center justify-start rounded-l-full bg-green-700 pl-1 text-white shadow-lg transition-colors hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800"
+                >
+                    <svg
+                        aria-hidden="true"
+                        viewBox="0 0 72 72"
+                        className="h-[4.25rem] w-[4.25rem] shrink-0 overflow-visible"
+                    >
+                        <path
+                            d="M11 67c2-16 12-24 25-24s23 8 25 24"
+                            fill="#f2c9a5"
+                            stroke="#5a3428"
+                            strokeWidth="2"
+                        />
+                        <circle
+                            cx="36"
+                            cy="34"
+                            r="23"
+                            fill="#f6d7bd"
+                            stroke="#5a3428"
+                            strokeWidth="2"
+                        />
+                        <path
+                            d="M13 33C12 15 22 7 37 7c14 0 23 9 23 24-5-5-9-11-11-17-8 8-20 12-36 12z"
+                            fill="#2f2422"
+                        />
+                        <ellipse cx="28" cy="36" rx="2" ry="3" fill="#28201e" />
+                        <ellipse cx="44" cy="36" rx="2" ry="3" fill="#28201e" />
+                        <path
+                            d="M31 45c3 3 7 3 10 0"
+                            fill="none"
+                            stroke="#9b5145"
+                            strokeLinecap="round"
+                            strokeWidth="2"
+                        />
+                        <path
+                            d="M18 56c2-5 7-7 12-5m26 5c-2-5-7-7-12-5"
+                            fill="none"
+                            stroke="#f6d7bd"
+                            strokeLinecap="round"
+                            strokeWidth="6"
+                        />
+                    </svg>
+                    <span className="absolute top-2 right-2 size-2.5 rounded-full border-2 border-green-700 bg-white" />
+                </button>
+            </div>
         </div>
     );
 }
