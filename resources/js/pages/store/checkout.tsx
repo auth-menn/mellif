@@ -86,6 +86,12 @@ function digitsOnly(value: string): string {
     return value.replace(/\D/g, '');
 }
 
+function qrisCustomerSupportUrl(orderNumber: string): string {
+    const message = `Halo CS, saya sudah melakukan pembayaran QRIS untuk pesanan ${orderNumber}, tetapi status pembayaran belum berubah. Mohon bantu pengecekan.`;
+
+    return `https://wa.me/6281330087106?text=${encodeURIComponent(message)}`;
+}
+
 async function downloadQrisImage(
     imageDataUrl: string,
     orderNumber: string,
@@ -833,6 +839,27 @@ export default function Checkout({
                                                       )}
                                             </button>
                                         )}
+                                        {isQrisExpired && (
+                                            <div className="mx-auto mt-3 max-w-sm">
+                                                <p className="text-sm leading-6 text-neutral-600">
+                                                    {t(
+                                                        'checkout.qrisSupportExpired',
+                                                    )}
+                                                </p>
+                                                <a
+                                                    href={qrisCustomerSupportUrl(
+                                                        order.orderNumber,
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="mt-3 inline-flex min-h-11 touch-manipulation items-center justify-center bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
+                                                >
+                                                    {t(
+                                                        'checkout.contactSupport',
+                                                    )}
+                                                </a>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 <div className="qris-dialog-info space-y-1 rounded-lg bg-neutral-50 px-3 py-2 text-center text-xs leading-5 text-neutral-500">
@@ -1381,6 +1408,27 @@ export default function Checkout({
                                             : t('checkout.qrisTryAgain')}
                                     </button>
                                 )}
+                                        {isQrisExpired && (
+                                            <div className="mx-auto mt-3 max-w-sm">
+                                                <p className="text-sm leading-6 text-neutral-600">
+                                                    {t(
+                                                        'checkout.qrisSupportExpired',
+                                                    )}
+                                                </p>
+                                                <a
+                                                    href={qrisCustomerSupportUrl(
+                                                        order.orderNumber,
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="mt-3 inline-flex min-h-11 touch-manipulation items-center justify-center bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
+                                                >
+                                                    {t(
+                                                        'checkout.contactSupport',
+                                                    )}
+                                                </a>
+                                            </div>
+                                        )}
                             </div>
                         )}
                         <div className="qris-dialog-info space-y-1 rounded-lg bg-neutral-50 px-3 py-2 text-center text-xs leading-5 text-neutral-500">

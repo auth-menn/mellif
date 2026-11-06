@@ -209,6 +209,17 @@ const messages = {
         'checkout.qrisTimeRemaining': 'Waktu tersisa',
         'checkout.qrisExpiredMessage':
             'QRIS sudah kedaluwarsa. Generate QRIS baru untuk melanjutkan pembayaran.',
+        'checkout.qrisSupportExpired':
+            'Jika Anda sudah membayar tetapi status pesanan belum berubah setelah QRIS kedaluwarsa, hubungi CS untuk membantu memeriksa pembayaran.',
+        'checkout.contactSupport': 'Hubungi CS via WhatsApp',
+        'support.chatTitle': 'Customer Service',
+        'support.chatGreeting': 'Halo, ada yang bisa kami bantu?',
+        'support.peekPrompt': 'Hubungi CS',
+        'support.chatDescription':
+            'Ada kendala dengan pesanan atau pembayaran? Hubungi tim kami melalui WhatsApp.',
+        'support.openChat': 'Buka chat Customer Service',
+        'support.closeChat': 'Tutup chat Customer Service',
+        'support.whatsappCta': 'Hubungi CS via WhatsApp',
         'checkout.qrisInstructions':
             'Pindai QR ini melalui aplikasi pembayaran untuk melanjutkan.',
         'checkout.downloadQris': 'Unduh QRIS',
@@ -628,6 +639,17 @@ const messages = {
         'checkout.qrisTimeRemaining': 'Time remaining',
         'checkout.qrisExpiredMessage':
             'This QRIS has expired. Generate a new QRIS to continue payment.',
+        'checkout.qrisSupportExpired':
+            'If you have paid but the order status has not changed after the QRIS expired, contact customer support to check your payment.',
+        'checkout.contactSupport': 'Contact support on WhatsApp',
+        'support.chatTitle': 'Customer Service',
+        'support.chatGreeting': 'Hello, how can we help you?',
+        'support.peekPrompt': 'Contact support',
+        'support.chatDescription':
+            'Having trouble with an order or payment? Contact our team on WhatsApp.',
+        'support.openChat': 'Open Customer Service chat',
+        'support.closeChat': 'Close Customer Service chat',
+        'support.whatsappCta': 'Contact support on WhatsApp',
         'checkout.qrisInstructions':
             'Scan this QR with your payment app to continue.',
         'checkout.downloadQris': 'Download QRIS',
