@@ -374,7 +374,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 {supportChatOpen && (
                     <section
                         aria-label={t('support.chatTitle')}
-                        className="absolute right-3 bottom-20 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl"
+                        className="support-chatbox-enter absolute right-3 bottom-20 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl"
                     >
                         <div className="flex items-center justify-between bg-green-700 px-4 py-3 text-white">
                             <div>
@@ -424,33 +424,51 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                     }
                     aria-expanded={supportChatOpen}
                     onClick={() => setSupportChatOpen((open) => !open)}
-                    className="relative flex h-[4.5rem] w-[4.25rem] touch-manipulation items-center justify-start rounded-l-full bg-green-700 pl-1 text-white shadow-lg transition-colors hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800"
+                    className={`support-peek-button relative flex h-[4.5rem] w-[4.25rem] touch-manipulation items-center justify-start rounded-l-full pl-1 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800 ${supportChatOpen ? 'support-peek-button-open' : ''}`}
                 >
                     <svg
                         aria-hidden="true"
                         viewBox="0 0 72 72"
-                        className="h-[4.25rem] w-[4.25rem] shrink-0 overflow-visible"
+                        className={`h-[4.25rem] w-[4.25rem] shrink-0 overflow-visible ${supportChatOpen ? 'support-peek-character-open' : 'support-peek-character'}`}
                     >
+                        <defs>
+                            <radialGradient id="support-skin" cx="35%" cy="25%">
+                                <stop offset="0%" stopColor="#fff0dc" />
+                                <stop offset="100%" stopColor="#e9ae82" />
+                            </radialGradient>
+                            <linearGradient id="support-hair" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#57413a" />
+                                <stop offset="55%" stopColor="#2f2422" />
+                                <stop offset="100%" stopColor="#171312" />
+                            </linearGradient>
+                            <linearGradient id="support-shirt" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#fffdf7" />
+                                <stop offset="100%" stopColor="#d8e8dd" />
+                            </linearGradient>
+                        </defs>
                         <path
                             d="M11 67c2-16 12-24 25-24s23 8 25 24"
-                            fill="#f2c9a5"
-                            stroke="#5a3428"
+                            fill="url(#support-shirt)"
+                            stroke="#8c6250"
                             strokeWidth="2"
                         />
                         <circle
                             cx="36"
                             cy="34"
                             r="23"
-                            fill="#f6d7bd"
-                            stroke="#5a3428"
+                            fill="url(#support-skin)"
+                            stroke="#bd8667"
                             strokeWidth="2"
                         />
                         <path
                             d="M13 33C12 15 22 7 37 7c14 0 23 9 23 24-5-5-9-11-11-17-8 8-20 12-36 12z"
-                            fill="#2f2422"
+                            fill="url(#support-hair)"
                         />
-                        <ellipse cx="28" cy="36" rx="2" ry="3" fill="#28201e" />
-                        <ellipse cx="44" cy="36" rx="2" ry="3" fill="#28201e" />
+                        <path d="M18 31c3-3 7-3 11-1m5 0c4-2 8-2 12 1" fill="none" stroke="#382823" strokeLinecap="round" strokeWidth="2" />
+                        <ellipse cx="28" cy="36" rx="2.3" ry="3.2" fill="#28201e" />
+                        <ellipse cx="44" cy="36" rx="2.3" ry="3.2" fill="#28201e" />
+                        <circle cx="28.8" cy="35" r="0.8" fill="#fff" />
+                        <circle cx="44.8" cy="35" r="0.8" fill="#fff" />
                         <path
                             d="M31 45c3 3 7 3 10 0"
                             fill="none"
@@ -461,9 +479,9 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                         <path
                             d="M18 56c2-5 7-7 12-5m26 5c-2-5-7-7-12-5"
                             fill="none"
-                            stroke="#f6d7bd"
+                            stroke="url(#support-skin)"
                             strokeLinecap="round"
-                            strokeWidth="6"
+                            strokeWidth="7"
                         />
                     </svg>
                     <span className="absolute top-2 right-2 size-2.5 rounded-full border-2 border-green-700 bg-white" />
