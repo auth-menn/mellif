@@ -42,6 +42,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const [languageOpen, setLanguageOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
     const [cart, setCart] = useState<CartLine[]>([]);
+    const [cartReady, setCartReady] = useState(false);
     const [cartOrders, setCartOrders] = useState<{ awaitingPayment: CartOrderSummary[]; paid: CartOrderSummary[] }>({ awaitingPayment: [], paid: [] });
     const [pendingCartRemoval, setPendingCartRemoval] = useState<CartLine | null>(null);
     const [cartRemovalProcessing, setCartRemovalProcessing] = useState(false);
@@ -105,6 +106,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             setCart(overview.items);
             setCartOrders(overview.orders);
             setCartCount(overview.items.reduce((sum, line) => sum + line.quantity, 0));
+            setCartReady(true);
             return;
         }
 
@@ -112,6 +114,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         setCart(lines);
         setCartOrders({ awaitingPayment: [], paid: [] });
         setCartCount(lines.reduce((sum, line) => sum + line.quantity, 0));
+        setCartReady(true);
     }, []);
 
     useEffect(() => {
@@ -371,7 +374,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                         </div>)}
                     </section>}
                 </div>
-                {cartSection === 'cart' && <button type="button" disabled={!cart.length} onClick={() => setCheckoutConfirmOpen(true)} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{t('cart.checkout')}</button>}
+                {cartSection === 'cart' && <button type="button" disabled={cartReady ? cart.length === 0 : undefined} onClick={() => { if (!cartReady || cart.length === 0) return; setCheckoutConfirmOpen(true); }} className="m-6 bg-black px-5 py-4 text-center text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{t('cart.checkout')}</button>}
             </aside>
             <Dialog open={checkoutConfirmOpen} onOpenChange={setCheckoutConfirmOpen}>
                 <DialogContent className="z-[90] bg-white text-neutral-900 sm:max-w-xl" overlayClassName="z-[80]">
@@ -423,7 +426,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 {supportChatOpen && (
                     <section
                         aria-label={t('support.chatTitle')}
-                        className="support-chatbox-enter absolute right-2 bottom-[119px] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-xl max-[767px]:bottom-[96px]"
+                        className="support-chatbox-enter absolute right-2 bottom-[119px] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-xl max-[767px]:bottom-[81px]"
                     >
                         <div className="flex items-center justify-between bg-[#0b0b0d] px-3 py-2.5 text-white">
                             <div>

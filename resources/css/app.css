@@ -217,28 +217,28 @@
 
 @media (max-width: 767px) {
     .support-peek-window {
-        width: 58px;
-        height: 91px;
+        width: 48px;
+        height: 76px;
     }
 
     .support-peek-wrap:hover .support-peek-window,
     .support-peek-wrap-open .support-peek-window {
-        width: 86px;
+        width: 72px;
     }
 
     .support-peek-svg {
-        width: 96px;
-        height: 91px;
+        width: 80px;
+        height: 76px;
     }
 
     .support-peek-trigger {
-        width: 96px;
-        height: 91px;
+        width: 80px;
+        height: 76px;
     }
 
     .support-peek-bubble {
-        right: 60px;
-        bottom: 41px;
+        right: 50px;
+        bottom: 34px;
         gap: 5px;
         margin-right: 3px;
         padding: 6px 9px;
