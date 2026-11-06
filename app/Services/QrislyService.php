@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Support\QrisInspector;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -67,7 +68,9 @@ class QrislyService
             'original_amount' => $originalAmount,
             'final_amount' => $finalAmount,
             'payment_status' => (string) $data['payment_status'],
-            'expiry_time' => (string) $data['expiry_time'],
+            'expiry_time' => CarbonImmutable::parse((string) $data['expiry_time'], 'Asia/Jakarta')
+                ->utc()
+                ->toIso8601String(),
         ];
     }
 
