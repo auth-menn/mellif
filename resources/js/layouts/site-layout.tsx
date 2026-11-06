@@ -46,8 +46,55 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const [pendingCartRemoval, setPendingCartRemoval] = useState<CartLine | null>(null);
     const [cartRemovalProcessing, setCartRemovalProcessing] = useState(false);
     const userRef = useRef(user);
+    const supportPupilLeftRef = useRef<SVGCircleElement | null>(null);
+    const supportPupilRightRef = useRef<SVGCircleElement | null>(null);
     userRef.current = user;
     const { language, setLanguage, t } = useTranslation();
+
+    useEffect(() => {
+        const moveSupportEyes = (pointerX: number, pointerY: number): void => {
+            const svg = supportPupilLeftRef.current?.ownerSVGElement;
+            if (!svg) return;
+
+            const bounds = svg.getBoundingClientRect();
+            const pupils = [
+                { element: supportPupilLeftRef.current, x: 74, y: 86 },
+                { element: supportPupilRightRef.current, x: 104, y: 86 },
+            ];
+
+            for (const pupil of pupils) {
+                if (!pupil.element) continue;
+
+                const eyeX = bounds.left + ((pupil.x - 22) / 200) * bounds.width;
+                const eyeY = bounds.top + ((pupil.y + 4) / 190) * bounds.height;
+                const angle = Math.atan2(pointerY - eyeY, pointerX - eyeX);
+                const distance = Math.min(
+                    4,
+                    Math.hypot(pointerX - eyeX, pointerY - eyeY) / 30,
+                );
+
+                pupil.element.setAttribute(
+                    'cx',
+                    String(pupil.x + Math.cos(angle) * distance),
+                );
+                pupil.element.setAttribute(
+                    'cy',
+                    String(pupil.y + Math.sin(angle) * distance),
+                );
+            }
+        };
+        const handlePointerMove = (event: PointerEvent): void => {
+            moveSupportEyes(event.clientX, event.clientY);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove, {
+            passive: true,
+        });
+
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+        };
+    }, []);
 
     const refreshCart = useCallback(async (): Promise<void> => {
         if (userRef.current) {
@@ -370,18 +417,20 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 onConfirm={() => { void confirmCartRemoval(); }}
             />
             <AuthModal open={authOpen} onOpenChange={setAuthOpen} initialMode={authInitialMode} />
-            <div className="fixed right-0 bottom-5 z-40 sm:bottom-6">
+            <div
+                className={`support-peek-wrap ${supportChatOpen ? 'support-peek-wrap-open' : ''}`}
+            >
                 {supportChatOpen && (
                     <section
                         aria-label={t('support.chatTitle')}
-                        className="support-chatbox-enter absolute right-3 bottom-20 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl"
+                        className="support-chatbox-enter absolute right-2 bottom-[119px] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-xl"
                     >
-                        <div className="flex items-center justify-between bg-green-700 px-4 py-3 text-white">
+                        <div className="flex items-center justify-between bg-[#0b0b0d] px-3 py-2.5 text-white">
                             <div>
-                                <p className="text-sm font-semibold">
+                                <p className="text-xs font-semibold">
                                     {t('support.chatTitle')}
                                 </p>
-                                <p className="mt-0.5 text-xs text-green-50">
+                                <p className="mt-0.5 text-[11px] text-neutral-300">
                                     {t('support.chatGreeting')}
                                 </p>
                             </div>
@@ -389,103 +438,175 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                                 type="button"
                                 aria-label={t('support.closeChat')}
                                 onClick={() => setSupportChatOpen(false)}
-                                className="rounded-full p-1.5 transition-colors hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                className="rounded-full p-1.5 transition-colors hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                             >
-                                <X size={18} />
+                                <X size={16} />
                             </button>
                         </div>
-                        <div className="space-y-4 p-4">
-                            <p className="rounded-xl rounded-tl-sm bg-neutral-100 px-3 py-2.5 text-sm leading-5 text-neutral-700">
+                        <div className="space-y-3 p-3">
+                            <p className="rounded-lg rounded-tl-sm bg-neutral-100 px-3 py-2 text-xs leading-5 text-neutral-700">
                                 {t('support.chatDescription')}
                             </p>
                             <a
                                 href="https://wa.me/6281330087106?text=Halo%20CS%2C%20saya%20membutuhkan%20bantuan%20terkait%20pesanan."
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800"
+                                className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#e11d2e] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#bd1424] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e11d2e]"
                             >
-                                <MessageCircle size={17} />
+                                <MessageCircle size={15} />
                                 {t('support.whatsappCta')}
                             </a>
                         </div>
                     </section>
                 )}
-                {!supportChatOpen && (
-                    <div className="absolute right-[4.5rem] bottom-3 whitespace-nowrap rounded-xl rounded-br-sm bg-white px-3 py-2 text-xs font-medium text-neutral-800 shadow-lg ring-1 ring-black/5">
-                        {t('support.peekPrompt')}
-                    </div>
-                )}
-                <button
-                    type="button"
-                    aria-label={
-                        supportChatOpen
-                            ? t('support.closeChat')
-                            : t('support.openChat')
-                    }
-                    aria-expanded={supportChatOpen}
-                    onClick={() => setSupportChatOpen((open) => !open)}
-                    className={`support-peek-button relative flex h-[4.5rem] w-[4.25rem] touch-manipulation items-center justify-start rounded-l-full pl-1 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800 ${supportChatOpen ? 'support-peek-button-open' : ''}`}
-                >
+                <div className="support-peek-bubble">
+                    <i aria-hidden="true" />
+                    {t('support.peekPrompt')}
+                </div>
+                <div className="support-peek-window">
+                    <button
+                        type="button"
+                        aria-label={
+                            supportChatOpen
+                                ? t('support.closeChat')
+                                : t('support.openChat')
+                        }
+                        aria-expanded={supportChatOpen}
+                        onClick={() => setSupportChatOpen((open) => !open)}
+                        className="support-peek-trigger"
+                    >
                     <svg
                         aria-hidden="true"
-                        viewBox="0 0 72 72"
-                        className={`h-[4.25rem] w-[4.25rem] shrink-0 overflow-visible ${supportChatOpen ? 'support-peek-character-open' : 'support-peek-character'}`}
+                        viewBox="0 0 200 190"
+                        className="support-peek-svg"
                     >
                         <defs>
-                            <radialGradient id="support-skin" cx="35%" cy="25%">
-                                <stop offset="0%" stopColor="#fff0dc" />
-                                <stop offset="100%" stopColor="#e9ae82" />
+                            <radialGradient id="support-skin" cx="35%" cy="28%" r="80%">
+                                <stop offset="0%" stopColor="#ffe3cf" />
+                                <stop offset="55%" stopColor="#f6c3a2" />
+                                <stop offset="100%" stopColor="#d99874" />
                             </radialGradient>
-                            <linearGradient id="support-hair" x1="0" y1="0" x2="1" y2="1">
-                                <stop offset="0%" stopColor="#57413a" />
-                                <stop offset="55%" stopColor="#2f2422" />
-                                <stop offset="100%" stopColor="#171312" />
+                            <radialGradient id="support-hair" cx="40%" cy="25%" r="85%">
+                                <stop offset="0%" stopColor="#3a3a40" />
+                                <stop offset="100%" stopColor="#050506" />
+                            </radialGradient>
+                            <radialGradient id="support-shirt" cx="40%" cy="20%" r="90%">
+                                <stop offset="0%" stopColor="#26262b" />
+                                <stop offset="100%" stopColor="#08080a" />
+                            </radialGradient>
+                            <radialGradient id="support-cup" cx="35%" cy="30%" r="80%">
+                                <stop offset="0%" stopColor="#ff4d5c" />
+                                <stop offset="100%" stopColor="#a40f1d" />
+                            </radialGradient>
+                            <linearGradient id="support-neck" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#bb7f5b" />
+                                <stop offset="50%" stopColor="#e2a883" />
+                                <stop offset="100%" stopColor="#f3bf9b" />
                             </linearGradient>
-                            <linearGradient id="support-shirt" x1="0" y1="0" x2="1" y2="1">
-                                <stop offset="0%" stopColor="#fffdf7" />
-                                <stop offset="100%" stopColor="#d8e8dd" />
-                            </linearGradient>
+                            <pattern id="support-pattern" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(-18)">
+                                <g fill="#e11d2e" opacity=".85">
+                                    <circle cx="12" cy="8.2" r="1.8" />
+                                    <circle cx="12" cy="15.8" r="1.8" />
+                                    <circle cx="8.2" cy="12" r="1.8" />
+                                    <circle cx="15.8" cy="12" r="1.8" />
+                                </g>
+                                <circle cx="12" cy="12" r="1.1" fill="#0a0a0c" />
+                                <g fill="#e11d2e" opacity=".4">
+                                    <circle cx="0" cy="0" r=".9" />
+                                    <circle cx="24" cy="0" r=".9" />
+                                    <circle cx="0" cy="24" r=".9" />
+                                    <circle cx="24" cy="24" r=".9" />
+                                </g>
+                            </pattern>
+                            <filter id="support-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feDropShadow dx="-3" dy="4" stdDeviation="4" floodColor="#000" floodOpacity=".4" />
+                            </filter>
                         </defs>
-                        <path
-                            d="M11 67c2-16 12-24 25-24s23 8 25 24"
-                            fill="url(#support-shirt)"
-                            stroke="#8c6250"
-                            strokeWidth="2"
-                        />
-                        <circle
-                            cx="36"
-                            cy="34"
-                            r="23"
-                            fill="url(#support-skin)"
-                            stroke="#bd8667"
-                            strokeWidth="2"
-                        />
-                        <path
-                            d="M13 33C12 15 22 7 37 7c14 0 23 9 23 24-5-5-9-11-11-17-8 8-20 12-36 12z"
-                            fill="url(#support-hair)"
-                        />
-                        <path d="M18 31c3-3 7-3 11-1m5 0c4-2 8-2 12 1" fill="none" stroke="#382823" strokeLinecap="round" strokeWidth="2" />
-                        <ellipse cx="28" cy="36" rx="2.3" ry="3.2" fill="#28201e" />
-                        <ellipse cx="44" cy="36" rx="2.3" ry="3.2" fill="#28201e" />
-                        <circle cx="28.8" cy="35" r="0.8" fill="#fff" />
-                        <circle cx="44.8" cy="35" r="0.8" fill="#fff" />
-                        <path
-                            d="M31 45c3 3 7 3 10 0"
-                            fill="none"
-                            stroke="#9b5145"
-                            strokeLinecap="round"
-                            strokeWidth="2"
-                        />
-                        <path
-                            d="M18 56c2-5 7-7 12-5m26 5c-2-5-7-7-12-5"
-                            fill="none"
-                            stroke="url(#support-skin)"
-                            strokeLinecap="round"
-                            strokeWidth="7"
-                        />
+                        <g className="support-character" filter="url(#support-shadow)">
+                            <path d="M65 98H97L99 134L84 152L66 134Z" fill="url(#support-neck)" />
+                            <ellipse cx="82" cy="134" rx="15" ry="6" fill="#7a4a30" opacity=".25" />
+                            <path d="M44 152C44 141 56 134 66 129C70 134 76 146 84 146C92 146 97 136 100 129L126 129L126 192L94 192C86 174 58 168 44 152Z" className="support-partial-body" fill="url(#support-shirt)" stroke="#8f1220" strokeWidth="1" strokeLinejoin="round" />
+                            <path d="M44 152C44 141 56 134 66 129C70 134 76 146 84 146C92 146 97 136 100 129L126 129L126 192L94 192C86 174 58 168 44 152Z" className="support-partial-body" fill="url(#support-pattern)" />
+                            <g className="support-full-body">
+                                <path d="M52 192C50 178 46 168 46 160C46 144 56 135 66 129C70 134 76 146 84 146C92 146 97 136 100 129C110 135 120 144 120 160C120 168 116 178 114 192Z" fill="url(#support-shirt)" />
+                                <path d="M52 192C50 178 46 168 46 160C46 144 56 135 66 129C70 134 76 146 84 146C92 146 97 136 100 129C110 135 120 144 120 160C120 168 116 178 114 192Z" fill="url(#support-pattern)" />
+                                <path d="M52 192C50 178 46 168 46 160C46 144 56 135 66 129M100 129C110 135 120 144 120 160C120 168 116 178 114 192" fill="none" stroke="#8f1220" />
+                                <path d="M43 154L43 176" fill="none" stroke="#e11d2e" strokeWidth="15" strokeLinecap="round" />
+                                <path d="M43 154L43 176" fill="none" stroke="#1a1a1e" strokeWidth="13.5" strokeLinecap="round" />
+                                <path d="M43 154L43 176" fill="none" stroke="url(#support-pattern)" strokeWidth="13.5" strokeLinecap="round" />
+                                <ellipse cx="43" cy="184" rx="6.5" ry="7.5" fill="url(#support-skin)" stroke="#c68a64" strokeWidth=".8" />
+                                <path d="M42 80C34 106 36 140 42 160C52 156 58 144 60 124Z" fill="url(#support-hair)" />
+                                <path d="M124 80C132 106 130 140 124 160C114 156 108 144 106 124Z" fill="url(#support-hair)" />
+                            </g>
+                            <path d="M66 129C70 134 76 146 84 146C92 146 97 136 100 129" fill="none" stroke="#e11d2e" strokeWidth="2.2" strokeLinecap="round" />
+                            <path className="support-hair-peek" d="M26 72C14 112 20 150 36 170C46 160 46 150 52 140C52 120 56 100 62 90Z" fill="url(#support-hair)" />
+                            <g className="support-grip">
+                                <path d="M52 148Q64 160 74 168" fill="none" stroke="#e11d2e" strokeWidth="21" strokeLinecap="round" />
+                                <path d="M52 148Q64 160 74 168" fill="none" stroke="#1a1a1e" strokeWidth="19" strokeLinecap="round" />
+                                <path d="M52 148Q64 160 74 168" fill="none" stroke="url(#support-pattern)" strokeWidth="19" strokeLinecap="round" />
+                                <path d="M74 168Q92 178 108 172" fill="none" stroke="#c68a64" strokeWidth="12" strokeLinecap="round" />
+                                <path d="M74 168Q92 178 108 172" fill="none" stroke="#f1bb98" strokeWidth="10.6" strokeLinecap="round" />
+                                <g stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
+                                    <rect x="98" y="160" width="18" height="30" rx="8" />
+                                    <rect x="102" y="160" width="26" height="7" rx="3.5" />
+                                    <rect x="102" y="167" width="28" height="7" rx="3.5" />
+                                    <rect x="102" y="174" width="26" height="7" rx="3.5" />
+                                    <rect x="102" y="181" width="22" height="7" rx="3.5" />
+                                </g>
+                            </g>
+                            <g className="support-rest-hand" transform="translate(-36 0)" stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
+                                <ellipse cx="79" cy="182" rx="9" ry="10" />
+                                <rect x="73" y="186" width="4.4" height="10" rx="2.2" />
+                                <rect x="78" y="187" width="4.4" height="10" rx="2.2" />
+                                <rect x="83" y="186" width="4.4" height="9" rx="2.2" />
+                            </g>
+                            <g transform="translate(-22 4)">
+                                <g className="support-head">
+                                    <circle cx="96" cy="82" r="44" fill="url(#support-skin)" />
+                                    <path d="M52 78C50 44 74 30 98 32c24 2 42 18 40 44-10-8-22-22-30-26-14 12-34 18-56 28Z" fill="url(#support-hair)" />
+                                    <ellipse cx="78" cy="48" rx="16" ry="6" fill="#fff" opacity=".18" transform="rotate(-20 78 48)" />
+                                    <path d="M54 80C50 46 76 28 96 30C118 32 142 48 139 80" fill="none" stroke="#17171b" strokeWidth="5.5" strokeLinecap="round" />
+                                    <path d="M54 80C50 46 76 28 96 30C118 32 142 48 139 80" fill="none" stroke="#e11d2e" strokeWidth="1.4" strokeLinecap="round" />
+                                    <circle cx="139" cy="88" r="11" fill="#17171b" />
+                                    <circle cx="139" cy="88" r="7" fill="url(#support-cup)" />
+                                    <circle cx="53" cy="88" r="11" fill="#17171b" />
+                                    <circle cx="53" cy="88" r="7" fill="url(#support-cup)" />
+                                    <ellipse cx="50" cy="85" rx="2.6" ry="2" fill="#fff" opacity=".4" />
+                                    <path d="M54 98C56 112 66 116 78 114" fill="none" stroke="#2b2b30" strokeWidth="3" strokeLinecap="round" />
+                                    <circle cx="80" cy="114" r="4.5" fill="#17171b" stroke="#e11d2e" strokeWidth="1.2" />
+                                    <g><circle cx="74" cy="86" r="10" fill="#fff" /><circle ref={supportPupilLeftRef} cx="74" cy="86" r="5.5" fill="#2a1a14" /><circle cx="72" cy="83.5" r="1.8" fill="#fff" /></g>
+                                    <g><circle cx="104" cy="86" r="10" fill="#fff" /><circle ref={supportPupilRightRef} cx="104" cy="86" r="5.5" fill="#2a1a14" /><circle cx="102" cy="83.5" r="1.8" fill="#fff" /></g>
+                                    <path d="M65 70q9-6 18-1M95 69q9-5 18 1" stroke="#3a261d" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                                    <ellipse cx="66" cy="102" rx="6" ry="3.5" fill="#ff8f8f" opacity=".5" />
+                                    <ellipse cx="114" cy="102" rx="6" ry="3.5" fill="#ff8f8f" opacity=".5" />
+                                    <path d="M84 104q10 9 20 0" stroke="#8a3a2e" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+                                </g>
+                            </g>
+                            <g className="support-upper-grip" stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
+                                <rect x="106" y="45" width="14" height="38" rx="7" />
+                                <rect x="106" y="50" width="22" height="7" rx="3.5" />
+                                <rect x="106" y="58" width="24" height="7" rx="3.5" />
+                                <rect x="106" y="66" width="24" height="7" rx="3.5" />
+                                <rect x="106" y="74" width="20" height="7" rx="3.5" />
+                            </g>
+                            <g className="support-wave">
+                                <path d="M116 154Q166 158 166 126" fill="none" stroke="#e11d2e" strokeWidth="13" strokeLinecap="round" />
+                                <path d="M116 154Q166 158 166 126" fill="none" stroke="#1a1a1e" strokeWidth="11.5" strokeLinecap="round" />
+                                <path d="M116 154Q166 158 166 126" fill="none" stroke="url(#support-pattern)" strokeWidth="11.5" strokeLinecap="round" />
+                                <g className="support-wave-hand" stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
+                                    <rect x="161" y="108" width="10" height="14" rx="4" />
+                                    <ellipse cx="166" cy="106" rx="10" ry="10" />
+                                    <rect x="157" y="88" width="4.6" height="16" rx="2.3" />
+                                    <rect x="162" y="85" width="4.6" height="18" rx="2.3" />
+                                    <rect x="167" y="86" width="4.6" height="17" rx="2.3" />
+                                    <rect x="172" y="90" width="4.2" height="14" rx="2.1" />
+                                    <rect x="151" y="104" width="12" height="5" rx="2.5" transform="rotate(-35 158 106)" />
+                                </g>
+                            </g>
+                        </g>
                     </svg>
-                    <span className="absolute top-2 right-2 size-2.5 rounded-full border-2 border-green-700 bg-white" />
-                </button>
+                    </button>
+                </div>
             </div>
         </div>
     );
