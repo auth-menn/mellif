@@ -499,31 +499,76 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                             <filter id="support-ghost-glow" x="-30%" y="-30%" width="160%" height="160%">
                                 <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#e11d2e" floodOpacity=".4" />
                             </filter>
-                            <path id="support-ghost-body" d="M82 12C66 12 55 30 54 52C53 70 50 90 44 106C36 124 28 150 30 170L36 178L42 172L48 184L56 175L63 188L72 178L80 190L89 179L97 188L106 176L114 184L121 174L128 180L134 168C138 150 130 126 120 106C114 90 111 70 110 52C109 30 98 12 82 12Z" />
+                            <filter id="support-ghost-rag" x="-10%" y="-10%" width="120%" height="120%">
+                                <feTurbulence type="fractalNoise" baseFrequency=".07" numOctaves="2" seed="4" result="noise" />
+                                <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G" />
+                            </filter>
+                            <filter id="support-ghost-hand-texture" x="-10%" y="-10%" width="120%" height="120%">
+                                <feTurbulence type="fractalNoise" baseFrequency=".25" numOctaves="2" seed="2" result="noise" />
+                                <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.6" xChannelSelector="R" yChannelSelector="G" />
+                            </filter>
+                            <filter id="support-ghost-grain" x="0" y="0" width="100%" height="100%">
+                                <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="3" seed="3" />
+                                <feColorMatrix values="0 0 0 0 .08 0 0 0 0 .08 0 0 0 0 .08 2.6 0 0 0 -1.15" />
+                            </filter>
+                            <filter id="support-ghost-grime" x="0" y="0" width="100%" height="100%">
+                                <feTurbulence type="fractalNoise" baseFrequency=".03 .055" numOctaves="4" seed="9" />
+                                <feColorMatrix values="0 0 0 0 .07 0 0 0 0 .07 0 0 0 0 .07 3.4 0 0 0 -1.45" />
+                            </filter>
+                            <linearGradient id="support-ghost-mask-gradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset=".25" stopColor="#222" />
+                                <stop offset=".6" stopColor="#bbb" />
+                                <stop offset="1" stopColor="#fff" />
+                            </linearGradient>
+                            <mask id="support-ghost-grime-mask">
+                                <rect x="0" y="0" width="200" height="190" fill="url(#support-ghost-mask-gradient)" />
+                            </mask>
+                            <clipPath id="support-ghost-face-clip">
+                                <path d="M82 34C71 36 68 50 68 64C68 82 73 98 82 112C91 98 96 82 96 64C96 50 93 36 82 34Z" />
+                            </clipPath>
+                            <path id="support-ghost-body" d="M82 12C66 12 55 30 54 52C53 70 50 90 44 106C36 124 28 150 30 170L36 180L40 172L46 186L52 174L58 189L64 176L70 190L77 178L84 190L90 177L97 189L104 175L111 188L117 176L123 186L128 174L134 180C138 150 130 126 120 106C114 90 111 70 110 52C109 30 98 12 82 12Z" />
                             <clipPath id="support-ghost-body-clip">
                                 <use href="#support-ghost-body" />
                             </clipPath>
-                            <g id="support-ghost-hand-shape" fill="url(#support-ghost-hand)" stroke="#0c0c0e" strokeWidth=".6">
+                            <g id="support-ghost-hand-shape" filter="url(#support-ghost-hand-texture)" fill="url(#support-ghost-hand)" stroke="#0c0c0e" strokeWidth=".6">
                                 <ellipse cx="0" cy="0" rx="8" ry="9" />
                                 <rect x="5" y="-9" width="17" height="4.4" rx="2.2" transform="rotate(-14 5 -7)" />
                                 <rect x="6" y="-3.8" width="19" height="4.4" rx="2.2" transform="rotate(-5 6 -2)" />
                                 <rect x="6" y="1.6" width="18" height="4.4" rx="2.2" transform="rotate(5 6 3)" />
                                 <rect x="5" y="7" width="15" height="4.4" rx="2.2" transform="rotate(16 5 9)" />
                                 <rect x="-2" y="-14" width="12" height="4.4" rx="2.2" transform="rotate(-50 0 -8)" />
+                                <path d="M4 -6L20 -9M5 -1L22 -3M5 4L21 4M3 8L17 12" fill="none" stroke="#9a9aa0" strokeWidth=".6" opacity=".45" />
+                                <path d="M-4 -4Q0 -6 4 -4M-5 2Q0 0 5 2" fill="none" stroke="#0c0c0e" strokeWidth=".7" opacity=".5" />
+                            </g>
+                            <g id="support-ghost-arm-shape">
+                                <path d="M58 110C42 116 26 128 16 140L10 150L18 150L14 162L24 156L28 168L38 152C48 146 56 136 62 126Z" fill="url(#support-ghost-sheet)" stroke="#6e6a62" strokeWidth=".6" />
+                                <path d="M10 150L18 150L14 162L24 156L28 168" fill="none" stroke="#222" strokeWidth="1.6" opacity=".6" />
+                                <use href="#support-ghost-hand-shape" transform="translate(15 160) rotate(125)" />
                             </g>
                         </defs>
                         <g className="support-ghost-character" filter="url(#support-ghost-glow)">
                             <g className="support-ghost-shift">
-                                <use href="#support-ghost-body" fill="url(#support-ghost-sheet)" />
-                                <g clipPath="url(#support-ghost-body-clip)">
-                                    <rect x="20" y="136" width="130" height="56" fill="url(#support-ghost-dirt)" />
-                                    <ellipse cx="44" cy="132" rx="6" ry="15" fill="#161616" opacity=".4" transform="rotate(8 44 132)" />
-                                    <ellipse cx="120" cy="140" rx="5" ry="14" fill="#161616" opacity=".4" transform="rotate(-8 120 140)" />
-                                    <path d="M70 120C66 140 68 160 64 182M94 120C98 140 96 160 100 182M82 116L82 178" fill="none" stroke="#6e6a62" strokeWidth="1.2" opacity=".45" />
-                                    <ellipse cx="66" cy="32" rx="9" ry="14" fill="#fff" opacity=".45" transform="rotate(20 66 32)" />
+                                <g filter="url(#support-ghost-rag)">
+                                    <use href="#support-ghost-body" fill="url(#support-ghost-sheet)" />
+                                    <g clipPath="url(#support-ghost-body-clip)">
+                                        <rect x="20" y="136" width="130" height="56" fill="url(#support-ghost-dirt)" />
+                                        <ellipse cx="44" cy="132" rx="6" ry="15" fill="#161616" opacity=".4" transform="rotate(8 44 132)" />
+                                        <ellipse cx="120" cy="140" rx="5" ry="14" fill="#161616" opacity=".4" transform="rotate(-8 120 140)" />
+                                        <path d="M70 120C66 140 68 160 64 184M94 120C98 140 96 160 100 184M82 116C80 140 84 160 82 186M58 70C54 90 50 106 42 124M106 70C110 90 114 106 122 124M56 130C52 146 52 160 54 176M108 130C112 146 112 160 110 176" fill="none" stroke="#5a564e" strokeWidth="1.6" opacity=".5" />
+                                        <path d="M74 120C70 140 72 160 68 184M98 120C102 140 100 160 104 184M62 70C58 90 54 106 46 124M102 70C106 90 110 106 118 124" fill="none" stroke="#fff" strokeWidth="1.8" opacity=".55" />
+                                        <path d="M54 52C60 44 70 38 82 36M110 52C104 44 94 38 82 36" fill="none" stroke="#5a564e" strokeWidth="1.4" opacity=".4" />
+                                        <rect x="20" y="10" width="130" height="182" fill="#000" filter="url(#support-ghost-grime)" mask="url(#support-ghost-grime-mask)" opacity=".85" />
+                                        <rect x="20" y="10" width="130" height="182" fill="#000" filter="url(#support-ghost-grain)" opacity=".45" />
+                                        <ellipse cx="66" cy="32" rx="9" ry="14" fill="#fff" opacity=".45" transform="rotate(20 66 32)" />
+                                    </g>
                                 </g>
                                 <path d="M82 34C71 36 68 50 68 64C68 82 73 98 82 112C91 98 96 82 96 64C96 50 93 36 82 34Z" fill="url(#support-ghost-face)" stroke="#8a857b" strokeWidth=".8" />
-                                <path d="M76 92C72 84 70 76 70 70M88 92C92 84 94 76 94 70M72 52C75 46 78 44 82 43M92 52C89 46 86 44 82 43" fill="none" stroke="#7d786e" strokeWidth="1" opacity=".7" />
+                                <path d="M76 92C72 84 70 76 70 70M88 92C92 84 94 76 94 70M72 52C75 46 78 44 82 43M92 52C89 46 86 44 82 43M72 62C70 70 71 80 75 90M92 62C94 70 93 80 89 90M78 104C74 100 72 96 72 92M86 104C90 100 92 96 92 92M70 76C74 74 78 76 80 78M94 76C90 74 86 76 84 78M69 86C72 88 75 92 76 96M95 86C92 88 89 92 88 96" fill="none" stroke="#6e6a62" strokeWidth=".7" opacity=".75" />
+                                <g clipPath="url(#support-ghost-face-clip)">
+                                    <rect x="60" y="30" width="44" height="86" fill="#000" filter="url(#support-ghost-grain)" opacity=".55" />
+                                    <path d="M82 34C71 36 68 50 68 64C68 82 73 98 82 112C91 98 96 82 96 64C96 50 93 36 82 34Z" fill="none" stroke="#3a3730" strokeWidth="5" opacity=".35" />
+                                </g>
+                                <ellipse cx="82" cy="60" rx="14.5" ry="15.5" fill="none" stroke="#6e6a62" strokeWidth="2" opacity=".5" />
                                 <ellipse cx="82" cy="60" rx="13" ry="14" fill="url(#support-ghost-sock)" />
                                 <circle cx="82" cy="60" r="11" fill="#e11d2e" opacity=".18" />
                                 <g ref={supportGhostEyeRef}>
@@ -538,7 +583,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                                     <g className="support-ghost-float-left"><use href="#support-ghost-hand-shape" transform="translate(26 132) scale(1.1) rotate(200)" /></g>
                                     <g className="support-ghost-float-right"><use href="#support-ghost-hand-shape" transform="translate(138 132) scale(-1.1 1.1) rotate(200)" /></g>
                                 </g>
-                                <g className="support-ghost-grip" fill="url(#support-ghost-hand)" stroke="#0c0c0e" strokeWidth=".6">
+                                <g className="support-ghost-grip" filter="url(#support-ghost-hand-texture)" fill="url(#support-ghost-hand)" stroke="#0c0c0e" strokeWidth=".6">
                                     <rect x="96" y="96" width="16" height="32" rx="8" />
                                     <rect x="104" y="96" width="24" height="7" rx="3.5" />
                                     <rect x="104" y="104" width="26" height="7" rx="3.5" />
