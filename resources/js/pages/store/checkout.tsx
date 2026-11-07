@@ -537,9 +537,9 @@ export default function Checkout({
     const isQrisExpired =
         paymentStatus === 'expired' ||
         (paymentStatus === 'unpaid' && qrisSecondsRemaining === 0);
-    const canGenerateQris = ['failed', 'expired', 'cancelled'].includes(
-        paymentStatus ?? '',
-    );
+    const canGenerateQris =
+        isQrisExpired ||
+        ['failed', 'expired', 'cancelled'].includes(paymentStatus ?? '');
     const hasActiveCheckoutQris = Boolean(
         order &&
             keepCheckoutVisible &&

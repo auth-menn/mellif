@@ -215,7 +215,8 @@ class CheckoutController extends Controller
 
         $this->queueOrderNotifications($order->load(['user', 'items']));
 
-        return redirect()->route('checkout.show')->with('order_number', $order->order_number);
+        return redirect()->route('checkout.show', ['order' => $order->order_number])
+            ->with('order_number', $order->order_number);
     }
 
     private function queueOrderNotifications(Order $order): void
@@ -346,7 +347,6 @@ class CheckoutController extends Controller
                         return false;
                     }
 
-                    abort_unless($lockedOrder->qris_regeneration_count < 3, 429);
                     $lockedOrder->increment('qris_regeneration_count');
 
                     return true;
@@ -372,7 +372,8 @@ class CheckoutController extends Controller
 
                 Cache::forget(QrisPaymentSettlement::statusCacheKey($currentOrder));
 
-                return redirect()->route('checkout.show')->with('order_number', $currentOrder->order_number);
+                return redirect()->route('checkout.show', ['order' => $currentOrder->order_number])
+                    ->with('order_number', $currentOrder->order_number);
             });
         } catch (LockTimeoutException) {
             abort(409, 'Permintaan QRIS sedang diproses. Coba kembali sebentar lagi.');
@@ -403,7 +404,7 @@ class CheckoutController extends Controller
     {
         DB::transaction(function () use ($order): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-            if ($lockedOrder->qris_payment_status !== 'paid') {
+            if ($lockedOrder->qris_payment_status !== 'paid' && $lockedOrder->qrisly_history_id === null) {
                 $lockedOrder->update(['qris_payment_status' => 'failed']);
             }
         });

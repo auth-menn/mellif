@@ -170,7 +170,7 @@ it('creates an order with server prices without reducing stock before QRIS payme
         'expected_shipping_cost' => 18000,
         'payment_method_id' => $payment->id,
         'items' => [['variant_id' => $variant->id, 'qty' => 2]],
-    ])->assertRedirect(route('checkout.show'))
+    ])->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]))
         ->assertSessionHas('order_number', Order::query()->value('order_number'));
 
     $this->assertDatabaseHas('orders', [

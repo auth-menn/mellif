@@ -123,7 +123,7 @@ it('generates a replacement QRIS for an expired order', function () {
     ]);
 
     $this->actingAs($owner)->post(route('checkout.orders.qris.regenerate', $order))
-        ->assertRedirect(route('checkout.show'));
+        ->assertRedirect(route('checkout.show', ['order' => $order->order_number]));
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->id,
@@ -176,7 +176,7 @@ it('does not store the provider placeholder as a QRIS payment code', function ()
     ]);
 
     $this->actingAs($owner)->post(route('checkout.orders.qris.regenerate', $order))
-        ->assertRedirect(route('checkout.show'));
+        ->assertRedirect(route('checkout.show', ['order' => $order->order_number]));
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->id,
@@ -213,7 +213,7 @@ it('accepts the provider unique amount while preserving the order base amount', 
 
     $this->actingAs($context['owner'])
         ->post(route('checkout.orders.qris.regenerate', $context['order']))
-        ->assertRedirect(route('checkout.show'));
+        ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
 
     Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/generate-qris')
         && $request['amount'] === 100000
@@ -254,11 +254,11 @@ it('rejects a QRIS response when its original amount does not match the order', 
 
     $this->actingAs($context['owner'])
         ->post(route('checkout.orders.qris.regenerate', $context['order']))
-        ->assertRedirect(route('checkout.show'));
+        ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
 
     $this->assertDatabaseHas('orders', [
         'id' => $context['order']->id,
-        'qris_payment_status' => 'failed',
+        'qris_payment_status' => 'expired',
         'qris_string' => null,
     ]);
 });
@@ -291,13 +291,13 @@ it('rejects a QR payload whose encoded amount differs from the provider final am
 
     $this->actingAs($context['owner'])
         ->post(route('checkout.orders.qris.regenerate', $context['order']))
-        ->assertRedirect(route('checkout.show'));
+        ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
 
     Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/generate-qris')
         && $request['amount'] === 100000);
     $this->assertDatabaseHas('orders', [
         'id' => $context['order']->id,
-        'qris_payment_status' => 'failed',
+        'qris_payment_status' => 'expired',
         'qris_string' => null,
     ]);
 });
@@ -356,7 +356,7 @@ it('denies another user access to QRIS cancellation and regeneration', function 
     $this->actingAs($otherUser)->post(route('checkout.orders.qris.regenerate', $context['order']))->assertNotFound();
 });
 
-it('keeps the existing QR when the provider still reports unpaid, even after the local expiry time', function () {
+it('generates a replacement QR when the local expiry has passed even if the provider still reports unpaid', function () {
     Http::preventStrayRequests();
     $context = makeCheckoutQrisOrder('MLF-QRIS-ACTIVE', [
         'qris_payment_status' => 'unpaid',
@@ -371,20 +371,32 @@ it('keeps the existing QR when the provider still reports unpaid, even after the
             'meta' => ['status' => 'success', 'code' => 200],
             'data' => ['history_id' => 8759, 'payment_status' => 'unpaid'],
         ]),
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => [
+                'history_id' => 8780,
+                'qris_string' => qrisPayloadWithAmount(100001),
+                'original_amount' => 100000,
+                'final_amount' => 100001,
+                'payment_status' => 'unpaid',
+                'expiry_time' => now()->addMinutes(15)->toDateTimeString(),
+            ],
+        ]),
     ]);
 
     $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
         ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
 
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
     $this->assertDatabaseHas('orders', [
         'id' => $context['order']->id,
-        'qris_regeneration_count' => 0,
+        'qris_regeneration_count' => 1,
+        'qrisly_history_id' => 8780,
         'qris_payment_status' => 'unpaid',
     ]);
 });
 
-it('limits QRIS regeneration to three attempts per order', function () {
+it('allows QRIS regeneration after more than three expired QR codes', function () {
     Http::preventStrayRequests();
     $context = makeCheckoutQrisOrder('MLF-QRIS-REGEN-LIMIT');
     config([
@@ -421,19 +433,16 @@ it('limits QRIS regeneration to three attempts per order', function () {
         return Http::response([], 404);
     });
 
-    for ($attempt = 0; $attempt < 3; $attempt++) {
+    for ($attempt = 0; $attempt < 4; $attempt++) {
         $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
-            ->assertRedirect(route('checkout.show'));
+            ->assertRedirect(route('checkout.show', ['order' => $context['order']->order_number]));
     }
 
-    $this->actingAs($context['owner'])->post(route('checkout.orders.qris.regenerate', $context['order']))
-        ->assertStatus(429);
-
-    expect($generatedCount)->toBe(3);
+    expect($generatedCount)->toBe(4);
     $this->assertDatabaseHas('orders', [
         'id' => $context['order']->id,
-        'qris_regeneration_count' => 3,
-        'qrisly_history_id' => 8762,
+        'qris_regeneration_count' => 4,
+        'qrisly_history_id' => 8763,
     ]);
 });
 

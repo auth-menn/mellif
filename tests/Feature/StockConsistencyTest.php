@@ -125,7 +125,7 @@ describe('checkout stock consistency', function () {
                 ['variant_id' => $variant->id, 'qty' => 3],
                 ['variant_id' => $variant->id, 'qty' => 2],
             ]))
-            ->assertRedirect(route('checkout.show'))
+            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]))
             ->assertSessionHas('order_number', Order::query()->value('order_number'));
 
         expect($variant->fresh()->stock)->toBe(0)
@@ -180,7 +180,7 @@ describe('checkout stock consistency', function () {
 
         $this->actingAs($context['user'])
             ->post('/checkout', $payload)
-            ->assertRedirect(route('checkout.show'));
+            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
 
         $this->assertDatabaseHas('orders', [
             'payment_method' => 'QRIS',
@@ -258,7 +258,7 @@ describe('checkout stock consistency', function () {
             ->post('/checkout', stockConsistencyCheckoutPayload($context, [
                 ['variant_id' => $purchasedVariant->id, 'qty' => 1],
             ]))
-            ->assertRedirect(route('checkout.show'))
+            ->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]))
             ->assertSessionHas('order_number', Order::query()->value('order_number'));
 
         $this->assertDatabaseMissing('cart_items', ['id' => $purchasedCartItem->id]);

@@ -2,6 +2,7 @@
 
 use App\Mail\OrderPlaced;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -34,7 +35,7 @@ it('queues order notification emails for the store and the customer', function (
         'items' => [['variant_id' => $variant->id, 'qty' => 1]],
     ]);
 
-    $response->assertRedirect(route('checkout.show'));
+    $response->assertRedirect(route('checkout.show', ['order' => Order::query()->value('order_number')]));
     $this->assertDatabaseHas('orders', [
         'user_id' => $user->id,
         'payment_method_code' => 'transfer',
