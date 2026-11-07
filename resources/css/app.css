@@ -87,7 +87,7 @@
 
 .support-peek-bubble {
     position: absolute;
-    right: 74px;
+    right: 68px;
     bottom: 51px;
     display: flex;
     align-items: center;
@@ -117,7 +117,7 @@
 
 .support-peek-wrap:hover .support-peek-bubble,
 .support-peek-wrap-open .support-peek-bubble {
-    transform: translateX(-4px) scale(1.04);
+    transform: translateX(-12px) scale(1.04);
 }
 
 .support-ghost-arms {
@@ -218,7 +218,7 @@
     }
 
     .support-peek-bubble {
-        right: 50px;
+        right: 44px;
         bottom: 34px;
         gap: 5px;
         margin-right: 3px;
