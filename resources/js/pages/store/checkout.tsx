@@ -294,7 +294,12 @@ export default function Checkout({
             active = false;
             window.clearInterval(interval);
         };
-    }, [order?.id, order?.hasQris, paymentStatus]);
+    }, [
+        order?.id,
+        order?.hasQris,
+        order?.qrisExpiryTime,
+        paymentStatus,
+    ]);
 
     useEffect(() => {
         if (!user) return;
