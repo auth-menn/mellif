@@ -69,20 +69,19 @@
     outline-offset: -3px;
 }
 
-.support-character {
+.support-ghost-character {
     transform-origin: bottom center;
     animation: support-character-bob 3.5s ease-in-out infinite;
 }
 
-.support-head {
-    transform: rotate(-4deg);
-    transform-origin: 96px 124px;
-    transition: transform 450ms cubic-bezier(0.3, 1.5, 0.5, 1);
+.support-ghost-shift {
+    transform: translateX(12px);
+    transition: transform 500ms cubic-bezier(0.3, 1.1, 0.5, 1);
 }
 
-.support-peek-wrap:hover .support-head,
-.support-peek-wrap-open .support-head {
-    transform: translateX(8px);
+.support-peek-wrap:hover .support-ghost-shift,
+.support-peek-wrap-open .support-ghost-shift {
+    transform: translateX(0);
 }
 
 .support-peek-bubble {
@@ -120,58 +119,34 @@
     transform: translateX(-4px) scale(1.04);
 }
 
-.support-full-body,
-.support-wave {
+.support-ghost-arms {
     opacity: 0;
     transition: opacity 350ms 100ms;
 }
 
-.support-peek-wrap:hover .support-full-body,
-.support-peek-wrap:hover .support-wave,
-.support-peek-wrap-open .support-full-body,
-.support-peek-wrap-open .support-wave {
+.support-peek-wrap:hover .support-ghost-arms,
+.support-peek-wrap-open .support-ghost-arms {
     opacity: 1;
 }
 
-.support-partial-body {
-    transition: opacity 0s;
+.support-ghost-float-left,
+.support-ghost-float-right {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: support-ghost-float 2.4s ease-in-out infinite;
 }
 
-.support-peek-wrap:hover .support-partial-body,
-.support-peek-wrap-open .support-partial-body {
-    opacity: 0;
-    transition-delay: 400ms;
+.support-ghost-float-right {
+    animation-delay: -1.2s;
 }
 
-.support-hair-peek,
-.support-grip,
-.support-upper-grip {
+.support-ghost-grip {
     transition: opacity 250ms;
 }
 
-.support-peek-wrap:hover .support-hair-peek,
-.support-peek-wrap:hover .support-grip,
-.support-peek-wrap:hover .support-upper-grip,
-.support-peek-wrap-open .support-hair-peek,
-.support-peek-wrap-open .support-grip,
-.support-peek-wrap-open .support-upper-grip {
+.support-peek-wrap:hover .support-ghost-grip,
+.support-peek-wrap-open .support-ghost-grip {
     opacity: 0;
-}
-
-.support-wave-hand {
-    transform-box: view-box;
-    transform-origin: 166px 120px;
-    animation: support-wave-hand 700ms ease-in-out infinite alternate;
-}
-
-.support-rest-hand {
-    opacity: 0;
-    transition: opacity 350ms 100ms;
-}
-
-.support-peek-wrap:hover .support-rest-hand,
-.support-peek-wrap-open .support-rest-hand {
-    opacity: 1;
 }
 
 .support-chatbox-enter {
@@ -184,13 +159,9 @@
     }
 }
 
-@keyframes support-wave-hand {
-    from {
-        transform: rotate(-14deg);
-    }
-
-    to {
-        transform: rotate(14deg);
+@keyframes support-ghost-float {
+    50% {
+        translate: 0 -5px;
     }
 }
 
@@ -236,6 +207,15 @@
         height: 76px;
     }
 
+    .support-ghost-shift {
+        transform: translateX(8px);
+    }
+
+    .support-peek-wrap:hover .support-ghost-shift,
+    .support-peek-wrap-open .support-ghost-shift {
+        transform: translateX(0);
+    }
+
     .support-peek-bubble {
         right: 50px;
         bottom: 34px;
@@ -269,8 +249,9 @@
 @media (prefers-reduced-motion: reduce) {
     .shop-menu-arrow,
     .support-peek-window,
-    .support-character,
-    .support-wave-hand,
+    .support-ghost-character,
+    .support-ghost-float-left,
+    .support-ghost-float-right,
     .support-peek-bubble i,
     .support-chatbox-enter {
         animation: none;

@@ -47,45 +47,31 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     const [pendingCartRemoval, setPendingCartRemoval] = useState<CartLine | null>(null);
     const [cartRemovalProcessing, setCartRemovalProcessing] = useState(false);
     const userRef = useRef(user);
-    const supportPupilLeftRef = useRef<SVGCircleElement | null>(null);
-    const supportPupilRightRef = useRef<SVGCircleElement | null>(null);
+    const supportGhostEyeRef = useRef<SVGGElement | null>(null);
     userRef.current = user;
     const { language, setLanguage, t } = useTranslation();
 
     useEffect(() => {
-        const moveSupportEyes = (pointerX: number, pointerY: number): void => {
-            const svg = supportPupilLeftRef.current?.ownerSVGElement;
+        const moveSupportEye = (pointerX: number, pointerY: number): void => {
+            const svg = supportGhostEyeRef.current?.ownerSVGElement;
             if (!svg) return;
 
             const bounds = svg.getBoundingClientRect();
-            const pupils = [
-                { element: supportPupilLeftRef.current, x: 74, y: 86 },
-                { element: supportPupilRightRef.current, x: 104, y: 86 },
-            ];
+            const eyeX = bounds.left + (82 / 200) * bounds.width;
+            const eyeY = bounds.top + (60 / 190) * bounds.height;
+            const angle = Math.atan2(pointerY - eyeY, pointerX - eyeX);
+            const distance = Math.min(
+                4,
+                Math.hypot(pointerX - eyeX, pointerY - eyeY) / 30,
+            );
 
-            for (const pupil of pupils) {
-                if (!pupil.element) continue;
-
-                const eyeX = bounds.left + ((pupil.x - 22) / 200) * bounds.width;
-                const eyeY = bounds.top + ((pupil.y + 4) / 190) * bounds.height;
-                const angle = Math.atan2(pointerY - eyeY, pointerX - eyeX);
-                const distance = Math.min(
-                    4,
-                    Math.hypot(pointerX - eyeX, pointerY - eyeY) / 30,
-                );
-
-                pupil.element.setAttribute(
-                    'cx',
-                    String(pupil.x + Math.cos(angle) * distance),
-                );
-                pupil.element.setAttribute(
-                    'cy',
-                    String(pupil.y + Math.sin(angle) * distance),
-                );
-            }
+            supportGhostEyeRef.current?.setAttribute(
+                'transform',
+                `translate(${Math.cos(angle) * distance} ${Math.sin(angle) * distance})`,
+            );
         };
         const handlePointerMove = (event: PointerEvent): void => {
-            moveSupportEyes(event.clientX, event.clientY);
+            moveSupportEye(event.clientX, event.clientY);
         };
 
         window.addEventListener('pointermove', handlePointerMove, {
@@ -484,126 +470,80 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                         className="support-peek-svg"
                     >
                         <defs>
-                            <radialGradient id="support-skin" cx="35%" cy="28%" r="80%">
-                                <stop offset="0%" stopColor="#ffe3cf" />
-                                <stop offset="55%" stopColor="#f6c3a2" />
-                                <stop offset="100%" stopColor="#d99874" />
+                            <radialGradient id="support-ghost-sheet" cx="38%" cy="22%" r="85%">
+                                <stop offset="0" stopColor="#fbf9f3" />
+                                <stop offset=".5" stopColor="#d9d4c9" />
+                                <stop offset="1" stopColor="#8f8a80" />
                             </radialGradient>
-                            <radialGradient id="support-hair" cx="40%" cy="25%" r="85%">
-                                <stop offset="0%" stopColor="#3a3a40" />
-                                <stop offset="100%" stopColor="#050506" />
-                            </radialGradient>
-                            <radialGradient id="support-shirt" cx="40%" cy="20%" r="90%">
-                                <stop offset="0%" stopColor="#26262b" />
-                                <stop offset="100%" stopColor="#08080a" />
-                            </radialGradient>
-                            <radialGradient id="support-cup" cx="35%" cy="30%" r="80%">
-                                <stop offset="0%" stopColor="#ff4d5c" />
-                                <stop offset="100%" stopColor="#a40f1d" />
-                            </radialGradient>
-                            <linearGradient id="support-neck" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#bb7f5b" />
-                                <stop offset="50%" stopColor="#e2a883" />
-                                <stop offset="100%" stopColor="#f3bf9b" />
+                            <linearGradient id="support-ghost-face" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#d6d1c6" />
+                                <stop offset="1" stopColor="#9e998f" />
                             </linearGradient>
-                            <pattern id="support-pattern" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(-18)">
-                                <g fill="#e11d2e" opacity=".85">
-                                    <circle cx="12" cy="8.2" r="1.8" />
-                                    <circle cx="12" cy="15.8" r="1.8" />
-                                    <circle cx="8.2" cy="12" r="1.8" />
-                                    <circle cx="15.8" cy="12" r="1.8" />
-                                </g>
-                                <circle cx="12" cy="12" r="1.1" fill="#0a0a0c" />
-                                <g fill="#e11d2e" opacity=".4">
-                                    <circle cx="0" cy="0" r=".9" />
-                                    <circle cx="24" cy="0" r=".9" />
-                                    <circle cx="0" cy="24" r=".9" />
-                                    <circle cx="24" cy="24" r=".9" />
-                                </g>
-                            </pattern>
-                            <filter id="support-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                                <feDropShadow dx="-3" dy="4" stdDeviation="4" floodColor="#000" floodOpacity=".4" />
+                            <linearGradient id="support-ghost-dirt" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#141414" stopOpacity="0" />
+                                <stop offset="1" stopColor="#141414" stopOpacity=".75" />
+                            </linearGradient>
+                            <radialGradient id="support-ghost-sock" cx="50%" cy="40%" r="60%">
+                                <stop offset="0" stopColor="#1a1a1c" />
+                                <stop offset="1" stopColor="#000" />
+                            </radialGradient>
+                            <radialGradient id="support-ghost-iris" cx="40%" cy="35%" r="70%">
+                                <stop offset="0" stopColor="#ff8a8a" />
+                                <stop offset=".45" stopColor="#e11d2e" />
+                                <stop offset="1" stopColor="#6b0711" />
+                            </radialGradient>
+                            <radialGradient id="support-ghost-hand" cx="35%" cy="30%" r="80%">
+                                <stop offset="0" stopColor="#66666b" />
+                                <stop offset="1" stopColor="#1c1c1f" />
+                            </radialGradient>
+                            <filter id="support-ghost-glow" x="-30%" y="-30%" width="160%" height="160%">
+                                <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#e11d2e" floodOpacity=".4" />
                             </filter>
+                            <path id="support-ghost-body" d="M82 12C66 12 55 30 54 52C53 70 50 90 44 106C36 124 28 150 30 170L36 178L42 172L48 184L56 175L63 188L72 178L80 190L89 179L97 188L106 176L114 184L121 174L128 180L134 168C138 150 130 126 120 106C114 90 111 70 110 52C109 30 98 12 82 12Z" />
+                            <clipPath id="support-ghost-body-clip">
+                                <use href="#support-ghost-body" />
+                            </clipPath>
+                            <g id="support-ghost-hand-shape" fill="url(#support-ghost-hand)" stroke="#0c0c0e" strokeWidth=".6">
+                                <ellipse cx="0" cy="0" rx="8" ry="9" />
+                                <rect x="5" y="-9" width="17" height="4.4" rx="2.2" transform="rotate(-14 5 -7)" />
+                                <rect x="6" y="-3.8" width="19" height="4.4" rx="2.2" transform="rotate(-5 6 -2)" />
+                                <rect x="6" y="1.6" width="18" height="4.4" rx="2.2" transform="rotate(5 6 3)" />
+                                <rect x="5" y="7" width="15" height="4.4" rx="2.2" transform="rotate(16 5 9)" />
+                                <rect x="-2" y="-14" width="12" height="4.4" rx="2.2" transform="rotate(-50 0 -8)" />
+                            </g>
                         </defs>
-                        <g className="support-character" filter="url(#support-shadow)">
-                            <path d="M65 98H97L99 134L84 152L66 134Z" fill="url(#support-neck)" />
-                            <ellipse cx="82" cy="134" rx="15" ry="6" fill="#7a4a30" opacity=".25" />
-                            <path d="M44 152C44 141 56 134 66 129C70 134 76 146 84 146C92 146 97 136 100 129L126 129L126 192L94 192C86 174 58 168 44 152Z" className="support-partial-body" fill="url(#support-shirt)" stroke="#8f1220" strokeWidth="1" strokeLinejoin="round" />
-                            <path d="M44 152C44 141 56 134 66 129C70 134 76 146 84 146C92 146 97 136 100 129L126 129L126 192L94 192C86 174 58 168 44 152Z" className="support-partial-body" fill="url(#support-pattern)" />
-                            <g className="support-full-body">
-                                <path d="M52 192C50 178 46 168 46 160C46 144 56 135 66 129C70 134 76 146 84 146C92 146 97 136 100 129C110 135 120 144 120 160C120 168 116 178 114 192Z" fill="url(#support-shirt)" />
-                                <path d="M52 192C50 178 46 168 46 160C46 144 56 135 66 129C70 134 76 146 84 146C92 146 97 136 100 129C110 135 120 144 120 160C120 168 116 178 114 192Z" fill="url(#support-pattern)" />
-                                <path d="M52 192C50 178 46 168 46 160C46 144 56 135 66 129M100 129C110 135 120 144 120 160C120 168 116 178 114 192" fill="none" stroke="#8f1220" />
-                                <path d="M43 154L43 176" fill="none" stroke="#e11d2e" strokeWidth="15" strokeLinecap="round" />
-                                <path d="M43 154L43 176" fill="none" stroke="#1a1a1e" strokeWidth="13.5" strokeLinecap="round" />
-                                <path d="M43 154L43 176" fill="none" stroke="url(#support-pattern)" strokeWidth="13.5" strokeLinecap="round" />
-                                <ellipse cx="43" cy="184" rx="6.5" ry="7.5" fill="url(#support-skin)" stroke="#c68a64" strokeWidth=".8" />
-                                <path d="M42 80C34 106 36 140 42 160C52 156 58 144 60 124Z" fill="url(#support-hair)" />
-                                <path d="M124 80C132 106 130 140 124 160C114 156 108 144 106 124Z" fill="url(#support-hair)" />
-                            </g>
-                            <path d="M66 129C70 134 76 146 84 146C92 146 97 136 100 129" fill="none" stroke="#e11d2e" strokeWidth="2.2" strokeLinecap="round" />
-                            <path className="support-hair-peek" d="M26 72C14 112 20 150 36 170C46 160 46 150 52 140C52 120 56 100 62 90Z" fill="url(#support-hair)" />
-                            <g className="support-grip">
-                                <path d="M52 148Q64 160 74 168" fill="none" stroke="#e11d2e" strokeWidth="21" strokeLinecap="round" />
-                                <path d="M52 148Q64 160 74 168" fill="none" stroke="#1a1a1e" strokeWidth="19" strokeLinecap="round" />
-                                <path d="M52 148Q64 160 74 168" fill="none" stroke="url(#support-pattern)" strokeWidth="19" strokeLinecap="round" />
-                                <path d="M74 168Q92 178 108 172" fill="none" stroke="#c68a64" strokeWidth="12" strokeLinecap="round" />
-                                <path d="M74 168Q92 178 108 172" fill="none" stroke="#f1bb98" strokeWidth="10.6" strokeLinecap="round" />
-                                <g stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
-                                    <rect x="98" y="160" width="18" height="30" rx="8" />
-                                    <rect x="102" y="160" width="26" height="7" rx="3.5" />
-                                    <rect x="102" y="167" width="28" height="7" rx="3.5" />
-                                    <rect x="102" y="174" width="26" height="7" rx="3.5" />
-                                    <rect x="102" y="181" width="22" height="7" rx="3.5" />
+                        <g className="support-ghost-character" filter="url(#support-ghost-glow)">
+                            <g className="support-ghost-shift">
+                                <use href="#support-ghost-body" fill="url(#support-ghost-sheet)" />
+                                <g clipPath="url(#support-ghost-body-clip)">
+                                    <rect x="20" y="136" width="130" height="56" fill="url(#support-ghost-dirt)" />
+                                    <ellipse cx="44" cy="132" rx="6" ry="15" fill="#161616" opacity=".4" transform="rotate(8 44 132)" />
+                                    <ellipse cx="120" cy="140" rx="5" ry="14" fill="#161616" opacity=".4" transform="rotate(-8 120 140)" />
+                                    <path d="M70 120C66 140 68 160 64 182M94 120C98 140 96 160 100 182M82 116L82 178" fill="none" stroke="#6e6a62" strokeWidth="1.2" opacity=".45" />
+                                    <ellipse cx="66" cy="32" rx="9" ry="14" fill="#fff" opacity=".45" transform="rotate(20 66 32)" />
                                 </g>
-                            </g>
-                            <g className="support-rest-hand" transform="translate(-36 0)" stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
-                                <ellipse cx="79" cy="182" rx="9" ry="10" />
-                                <rect x="73" y="186" width="4.4" height="10" rx="2.2" />
-                                <rect x="78" y="187" width="4.4" height="10" rx="2.2" />
-                                <rect x="83" y="186" width="4.4" height="9" rx="2.2" />
-                            </g>
-                            <g transform="translate(-22 4)">
-                                <g className="support-head">
-                                    <circle cx="96" cy="82" r="44" fill="url(#support-skin)" />
-                                    <path d="M52 78C50 44 74 30 98 32c24 2 42 18 40 44-10-8-22-22-30-26-14 12-34 18-56 28Z" fill="url(#support-hair)" />
-                                    <ellipse cx="78" cy="48" rx="16" ry="6" fill="#fff" opacity=".18" transform="rotate(-20 78 48)" />
-                                    <path d="M54 80C50 46 76 28 96 30C118 32 142 48 139 80" fill="none" stroke="#17171b" strokeWidth="5.5" strokeLinecap="round" />
-                                    <path d="M54 80C50 46 76 28 96 30C118 32 142 48 139 80" fill="none" stroke="#e11d2e" strokeWidth="1.4" strokeLinecap="round" />
-                                    <circle cx="139" cy="88" r="11" fill="#17171b" />
-                                    <circle cx="139" cy="88" r="7" fill="url(#support-cup)" />
-                                    <circle cx="53" cy="88" r="11" fill="#17171b" />
-                                    <circle cx="53" cy="88" r="7" fill="url(#support-cup)" />
-                                    <ellipse cx="50" cy="85" rx="2.6" ry="2" fill="#fff" opacity=".4" />
-                                    <path d="M54 98C56 112 66 116 78 114" fill="none" stroke="#2b2b30" strokeWidth="3" strokeLinecap="round" />
-                                    <circle cx="80" cy="114" r="4.5" fill="#17171b" stroke="#e11d2e" strokeWidth="1.2" />
-                                    <g><circle cx="74" cy="86" r="10" fill="#fff" /><circle ref={supportPupilLeftRef} cx="74" cy="86" r="5.5" fill="#2a1a14" /><circle cx="72" cy="83.5" r="1.8" fill="#fff" /></g>
-                                    <g><circle cx="104" cy="86" r="10" fill="#fff" /><circle ref={supportPupilRightRef} cx="104" cy="86" r="5.5" fill="#2a1a14" /><circle cx="102" cy="83.5" r="1.8" fill="#fff" /></g>
-                                    <path d="M65 70q9-6 18-1M95 69q9-5 18 1" stroke="#3a261d" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                                    <ellipse cx="66" cy="102" rx="6" ry="3.5" fill="#ff8f8f" opacity=".5" />
-                                    <ellipse cx="114" cy="102" rx="6" ry="3.5" fill="#ff8f8f" opacity=".5" />
-                                    <path d="M84 104q10 9 20 0" stroke="#8a3a2e" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+                                <path d="M82 34C71 36 68 50 68 64C68 82 73 98 82 112C91 98 96 82 96 64C96 50 93 36 82 34Z" fill="url(#support-ghost-face)" stroke="#8a857b" strokeWidth=".8" />
+                                <path d="M76 92C72 84 70 76 70 70M88 92C92 84 94 76 94 70M72 52C75 46 78 44 82 43M92 52C89 46 86 44 82 43" fill="none" stroke="#7d786e" strokeWidth="1" opacity=".7" />
+                                <ellipse cx="82" cy="60" rx="13" ry="14" fill="url(#support-ghost-sock)" />
+                                <circle cx="82" cy="60" r="11" fill="#e11d2e" opacity=".18" />
+                                <g ref={supportGhostEyeRef}>
+                                    <circle cx="82" cy="60" r="7" fill="url(#support-ghost-iris)" />
+                                    <circle cx="82" cy="60" r="2.8" fill="#000" />
+                                    <circle cx="79.8" cy="57.6" r="1.4" fill="#fff" opacity=".9" />
                                 </g>
-                            </g>
-                            <g className="support-upper-grip" stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
-                                <rect x="106" y="45" width="14" height="38" rx="7" />
-                                <rect x="106" y="50" width="22" height="7" rx="3.5" />
-                                <rect x="106" y="58" width="24" height="7" rx="3.5" />
-                                <rect x="106" y="66" width="24" height="7" rx="3.5" />
-                                <rect x="106" y="74" width="20" height="7" rx="3.5" />
-                            </g>
-                            <g className="support-wave">
-                                <path d="M116 154Q166 158 166 126" fill="none" stroke="#e11d2e" strokeWidth="13" strokeLinecap="round" />
-                                <path d="M116 154Q166 158 166 126" fill="none" stroke="#1a1a1e" strokeWidth="11.5" strokeLinecap="round" />
-                                <path d="M116 154Q166 158 166 126" fill="none" stroke="url(#support-pattern)" strokeWidth="11.5" strokeLinecap="round" />
-                                <g className="support-wave-hand" stroke="#c68a64" strokeWidth=".8" fill="url(#support-skin)">
-                                    <rect x="161" y="108" width="10" height="14" rx="4" />
-                                    <ellipse cx="166" cy="106" rx="10" ry="10" />
-                                    <rect x="157" y="88" width="4.6" height="16" rx="2.3" />
-                                    <rect x="162" y="85" width="4.6" height="18" rx="2.3" />
-                                    <rect x="167" y="86" width="4.6" height="17" rx="2.3" />
-                                    <rect x="172" y="90" width="4.2" height="14" rx="2.1" />
-                                    <rect x="151" y="104" width="12" height="5" rx="2.5" transform="rotate(-35 158 106)" />
+                                <path d="M79 81L82 74L85 81Z" fill="#26262a" opacity=".85" />
+                                <ellipse cx="82" cy="99" rx="6.5" ry="10" fill="#000" />
+                                <ellipse cx="82" cy="104" rx="3.5" ry="4.5" fill="#2a0508" />
+                                <g className="support-ghost-arms">
+                                    <g className="support-ghost-float-left"><use href="#support-ghost-hand-shape" transform="translate(26 132) scale(1.1) rotate(200)" /></g>
+                                    <g className="support-ghost-float-right"><use href="#support-ghost-hand-shape" transform="translate(138 132) scale(-1.1 1.1) rotate(200)" /></g>
+                                </g>
+                                <g className="support-ghost-grip" fill="url(#support-ghost-hand)" stroke="#0c0c0e" strokeWidth=".6">
+                                    <rect x="96" y="96" width="16" height="32" rx="8" />
+                                    <rect x="104" y="96" width="24" height="7" rx="3.5" />
+                                    <rect x="104" y="104" width="26" height="7" rx="3.5" />
+                                    <rect x="104" y="112" width="24" height="7" rx="3.5" />
+                                    <rect x="104" y="120" width="20" height="7" rx="3.5" />
                                 </g>
                             </g>
                         </g>
