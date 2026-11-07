@@ -75,13 +75,14 @@
 }
 
 .support-ghost-shift {
-    transform: translateX(12px);
+    transform: translateX(12px) rotate(7deg);
+    transform-origin: 72% 92%;
     transition: transform 500ms cubic-bezier(0.3, 1.1, 0.5, 1);
 }
 
 .support-peek-wrap:hover .support-ghost-shift,
 .support-peek-wrap-open .support-ghost-shift {
-    transform: translateX(0);
+    transform: translateX(0) rotate(0);
 }
 
 .support-peek-bubble {
@@ -208,12 +209,12 @@
     }
 
     .support-ghost-shift {
-        transform: translateX(8px);
+        transform: translateX(8px) rotate(7deg);
     }
 
     .support-peek-wrap:hover .support-ghost-shift,
     .support-peek-wrap-open .support-ghost-shift {
-        transform: translateX(0);
+        transform: translateX(0) rotate(0);
     }
 
     .support-peek-bubble {
