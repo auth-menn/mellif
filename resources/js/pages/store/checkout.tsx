@@ -828,6 +828,11 @@ export default function Checkout({
                                                                 setQrisRegenerating(
                                                                     true,
                                                                 ),
+                                                            onSuccess: () =>
+                                                                router.reload({
+                                                                    preserveState: true,
+                                                                    preserveScroll: true,
+                                                                }),
                                                             onFinish: () =>
                                                                 setQrisRegenerating(
                                                                     false,
