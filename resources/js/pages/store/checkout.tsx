@@ -216,7 +216,7 @@ export default function Checkout({
 
     useEffect(() => {
         setPaymentStatus(qrisPaymentStatus(order?.qrisPaymentStatus));
-    }, [order?.id, order?.qrisPaymentStatus]);
+    }, [order?.id, order?.qrisPaymentStatus, order?.qrisExpiryTime]);
 
     useEffect(() => {
         if (order?.id) setQrisModalOpen(true);
