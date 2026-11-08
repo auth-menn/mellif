@@ -4,12 +4,15 @@ namespace App\Providers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Inertia\Inertia;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -37,6 +40,23 @@ class AppServiceProvider extends ServiceProvider
             fn (Request $request, array $headers) => $request->expectsJson()
                 ? response()->json(['message' => 'Terlalu banyak percobaan checkout. Coba lagi sebentar.'], 429, $headers)
                 : back()->withErrors(['items' => 'Terlalu banyak percobaan checkout. Coba lagi sebentar.']),
+        ));
+        RateLimiter::for('qris-status', fn (Request $request): Limit => Limit::perMinute(60)->by((string) ($request->user()?->id ?? $request->ip()))->response(
+            fn (Request $request, array $headers): JsonResponse => response()->json(['message' => 'Terlalu banyak pengecekan status pembayaran. Coba lagi sebentar.'], 429, $headers),
+        ));
+        RateLimiter::for('qris-regeneration', fn (Request $request): Limit => Limit::perMinute(10)->by((string) ($request->user()?->id ?? $request->ip()))->response(
+            function (Request $request, array $headers): RedirectResponse {
+                Inertia::flash('toast', ['type' => 'error', 'message' => 'checkout.qrisRateLimited']);
+
+                return back(303);
+            },
+        ));
+        RateLimiter::for('qris-cancellation', fn (Request $request): Limit => Limit::perMinute(6)->by((string) ($request->user()?->id ?? $request->ip()))->response(
+            function (Request $request, array $headers): RedirectResponse {
+                Inertia::flash('toast', ['type' => 'error', 'message' => 'checkout.qrisRateLimited']);
+
+                return back(303);
+            },
         ));
         RateLimiter::for('qrisly-webhook', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
     }

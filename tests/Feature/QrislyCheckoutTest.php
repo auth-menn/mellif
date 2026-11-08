@@ -446,6 +446,49 @@ it('allows QRIS regeneration after more than three expired QR codes', function (
     ]);
 });
 
+it('returns an Inertia redirect when QRIS regeneration is rate limited', function () {
+    Http::preventStrayRequests();
+    $context = makeCheckoutQrisOrder('MLF-QRIS-REGEN-RATE-LIMIT');
+    config([
+        'services.qrisly.key' => 'test-qrisly-key',
+        'services.qrisly.qris_id' => 123,
+        'services.qrisly.base_url' => 'https://api-sandbox.collaborator.komerce.id/user',
+    ]);
+    Http::fake([
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/payment-status/*' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => ['payment_status' => 'expired'],
+        ]),
+        'api-sandbox.collaborator.komerce.id/user/api/v1/qrisly/generate-qris' => Http::response([
+            'meta' => ['status' => 'success', 'code' => 200],
+            'data' => [
+                'history_id' => 8790,
+                'qris_string' => qrisPayloadWithAmount(100001),
+                'original_amount' => 100000,
+                'final_amount' => 100001,
+                'payment_status' => 'unpaid',
+                'expiry_time' => now()->addMinutes(15)->toDateTimeString(),
+            ],
+        ]),
+    ]);
+    $checkoutUrl = route('checkout.show', ['order' => $context['order']->order_number]);
+
+    for ($attempt = 0; $attempt < 10; $attempt++) {
+        $this->actingAs($context['owner'])
+            ->from($checkoutUrl)
+            ->post(route('checkout.orders.qris.regenerate', $context['order']))
+            ->assertRedirect($checkoutUrl);
+    }
+
+    $this->actingAs($context['owner'])
+        ->from($checkoutUrl)
+        ->withHeader('X-Inertia', 'true')
+        ->post(route('checkout.orders.qris.regenerate', $context['order']))
+        ->assertRedirect($checkoutUrl);
+
+    Http::assertSentCount(20);
+});
+
 it('rejects a concurrent QRIS regeneration while the order lock is held', function () {
     Http::preventStrayRequests();
     $context = makeCheckoutQrisOrder('MLF-QRIS-REGEN-LOCK');

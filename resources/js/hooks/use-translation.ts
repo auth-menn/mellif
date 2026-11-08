@@ -228,6 +228,8 @@ const messages = {
         'checkout.qrisGenerateFailed':
             'Pembayaran QRIS sementara tidak tersedia. Silakan coba lagi sebentar atau pilih metode pembayaran lain.',
         'checkout.qrisTryAgain': 'Generate QRIS',
+        'checkout.qrisRateLimited':
+            'Terlalu banyak percobaan QRIS. Coba kembali sebentar lagi.',
         'checkout.orderCancelled': 'Pesanan dibatalkan',
         'checkout.qrisStatus.unpaid': 'Menunggu pembayaran',
         'checkout.qrisStatus.paid': 'Pembayaran selesai',
@@ -658,6 +660,8 @@ const messages = {
         'checkout.qrisGenerateFailed':
             'QRIS payment is temporarily unavailable. Please try again shortly or choose another payment method.',
         'checkout.qrisTryAgain': 'Generate QRIS again',
+        'checkout.qrisRateLimited':
+            'Too many QRIS attempts. Please try again shortly.',
         'checkout.orderCancelled': 'Order cancelled',
         'checkout.qrisStatus.unpaid': 'Waiting for payment',
         'checkout.qrisStatus.paid': 'Payment complete',

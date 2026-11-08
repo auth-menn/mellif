@@ -41,10 +41,10 @@ Route::get('/user/confirm-password', [ConfirmablePasswordController::class, 'sho
     ->name('password.confirm');
 Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
 Route::post('/checkout', [CheckoutController::class, 'store'])->middleware(['auth', 'throttle:checkout'])->name('checkout.store');
-Route::middleware(['auth', 'throttle:10,1'])->prefix('checkout/orders/{order}')->name('checkout.orders.')->group(function () {
-    Route::get('/qris-status', [CheckoutController::class, 'paymentStatus'])->name('qris-status');
-    Route::post('/qris', [CheckoutController::class, 'regenerateQris'])->name('qris.regenerate');
-    Route::post('/cancel-payment', [CheckoutController::class, 'cancelQrisPayment'])->name('qris.cancel');
+Route::middleware('auth')->prefix('checkout/orders/{order}')->name('checkout.orders.')->group(function () {
+    Route::get('/qris-status', [CheckoutController::class, 'paymentStatus'])->middleware('throttle:qris-status')->name('qris-status');
+    Route::post('/qris', [CheckoutController::class, 'regenerateQris'])->middleware('throttle:qris-regeneration')->name('qris.regenerate');
+    Route::post('/cancel-payment', [CheckoutController::class, 'cancelQrisPayment'])->middleware('throttle:qris-cancellation')->name('qris.cancel');
 });
 Route::get('/shipping/destinations', [ShippingController::class, 'destinations'])->middleware('throttle:shipping-destinations')->name('shipping.destinations');
 Route::post('/shipping/rates', [ShippingController::class, 'rates'])->middleware('throttle:shipping-rates')->name('shipping.rates');
