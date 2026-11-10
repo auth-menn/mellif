@@ -38,6 +38,7 @@ class StorefrontController extends Controller
             'canonicalUrl' => route('home'),
         ]);
     }
+    
 
     /** @return list<string> */
     private function settingPaths(string $key): array
