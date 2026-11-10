@@ -93,7 +93,7 @@ class CheckoutController extends Controller
             && filled(config('services.turnstile.secret_key'))
             && ! $turnstile->verify($data['turnstile_token'], $request->ip())) {
             throw ValidationException::withMessages([
-                'turnstile_token' => 'Verifikasi keamanan gagal atau kedaluwarsa. Silakan verifikasi ulang.',
+                'turnstile_token' => 'Verifikasi keamanan tidak berhasil. Periksa koneksi internet, lalu selesaikan verifikasi lagi.',
             ]);
         }
 

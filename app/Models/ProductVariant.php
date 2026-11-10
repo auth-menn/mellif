@@ -12,7 +12,7 @@ class ProductVariant extends Model
     /** @use HasFactory<ProductVariantFactory> */
     use HasFactory;
 
-    protected $fillable = ['product_id', 'size', 'stock'];
+    protected $fillable = ['product_id', 'size', 'stock', 'sort_order'];
 
     public function product(): BelongsTo
     {

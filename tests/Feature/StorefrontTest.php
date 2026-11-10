@@ -115,6 +115,81 @@ it('combines the selected shop category and size filters on the same product', f
             ->where('products.total', 0));
 });
 
+it('lists available sizes in clothing order in the shop filters', function () {
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt-sizes']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Filter Order Tee',
+        'slug' => 'filter-order-tee',
+        'description' => 'A tee to verify filter ordering',
+        'price' => 100000,
+        'is_active' => true,
+    ]);
+
+    foreach (['XL', 'L', 'M', 'S'] as $size) {
+        ProductVariant::query()->create(['product_id' => $product->id, 'size' => $size, 'stock' => 1]);
+    }
+
+    $this->get('/shop')
+        ->assertInertia(fn ($page) => $page
+            ->where('sizes', ['S', 'M', 'L', 'XL']));
+});
+
+it('returns Turnstile verification failures as checkout form errors for Inertia requests', function () {
+    config([
+        'app.url' => 'https://mellifstudio.com',
+        'services.turnstile.site_key' => 'test-site-key',
+        'services.turnstile.secret_key' => 'test-secret-key',
+    ]);
+    Http::fake([
+        'challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+            'success' => false,
+            'error-codes' => ['timeout-or-duplicate'],
+        ]),
+    ]);
+
+    $user = User::factory()->create();
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 'turnstile-shirt']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Turnstile Tee',
+        'slug' => 'turnstile-tee',
+        'description' => 'A tee for checkout verification',
+        'price' => 100000,
+        'is_active' => true,
+    ]);
+    $variant = ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'M', 'stock' => 1]);
+    $payment = PaymentMethod::query()->create(['name' => 'QRIS', 'code' => 'qris', 'is_active' => true]);
+
+    $this->actingAs($user)
+        ->withHeaders([
+            'Accept' => 'text/html, application/xhtml+xml',
+            'X-Inertia' => 'true',
+            'X-Requested-With' => 'XMLHttpRequest',
+        ])
+        ->from(route('checkout.show'))
+        ->post(route('checkout.store'), [
+            'recipient_name' => 'Test Buyer',
+            'phone' => '08123456789',
+            'address' => 'Jakarta',
+            'delivery_method' => 'direct_cod',
+            'destination_id' => null,
+            'destination_label' => null,
+            'courier_code' => null,
+            'courier_service' => null,
+            'expected_shipping_cost' => null,
+            'payment_method_id' => $payment->id,
+            'turnstile_token' => 'used-token',
+            'items' => [['variant_id' => $variant->id, 'qty' => 1]],
+        ])
+        ->assertRedirect(route('checkout.show'))
+        ->assertSessionHasErrors([
+            'turnstile_token' => 'Verifikasi keamanan tidak berhasil. Periksa koneksi internet, lalu selesaikan verifikasi lagi.',
+        ]);
+
+    $this->assertDatabaseCount('orders', 0);
+});
+
 it('creates an order with server prices without reducing stock before QRIS payment', function () {
     config(['services.rajaongkir.key' => 'test-key', 'services.rajaongkir.origin_id' => 1391]);
     config([

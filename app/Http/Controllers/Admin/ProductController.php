@@ -201,8 +201,11 @@ class ProductController extends Controller
             $variant->delete();
         });
 
-        foreach ($variants as $variant) {
-            $product->variants()->updateOrCreate(['size' => $variant['size']], ['stock' => $variant['stock']]);
+        foreach ($variants as $position => $variant) {
+            $product->variants()->updateOrCreate(
+                ['size' => $variant['size']],
+                ['stock' => $variant['stock'], 'sort_order' => $position],
+            );
         }
     }
 }

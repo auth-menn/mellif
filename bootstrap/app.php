@@ -38,11 +38,14 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->expectsJson() || $request->header('X-Inertia') === 'true',
+            fn (Request $request, Throwable $exception): bool => $request->is('api/*')
+                || ($request->expectsJson() && $request->header('X-Inertia') !== 'true'),
         );
 
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
-            if (! in_array($response->getStatusCode(), [403, 404], true) || $request->expectsJson()) {
+            $isInertiaRequest = $request->header('X-Inertia') === 'true';
+
+            if (! in_array($response->getStatusCode(), [403, 404], true) || ($request->expectsJson() && ! $isInertiaRequest)) {
                 return $response;
             }
 

@@ -40,6 +40,51 @@ it('creates a product with ordered uploaded images and variants', function () {
     Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
 });
 
+it('preserves the submitted variant order when editing and displays it in the storefront', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+    $category = Category::query()->create(['name' => 'T-Shirt', 'slug' => 't-shirt']);
+    $product = Product::query()->create([
+        'category_id' => $category->id,
+        'name' => 'Ordered Tee',
+        'slug' => 'ordered-tee',
+        'description' => 'A tee with ordered sizes',
+        'price' => 100000,
+        'weight' => 500,
+        'is_active' => true,
+    ]);
+
+    ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'M', 'stock' => 1]);
+    ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'S', 'stock' => 1]);
+    ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'L', 'stock' => 1]);
+    ProductVariant::query()->create(['product_id' => $product->id, 'size' => 'XL', 'stock' => 1]);
+
+    $this->actingAs($admin)->put(route('admin.products.update', $product), [
+        'category_id' => $category->id,
+        'name' => $product->name,
+        'description' => $product->description,
+        'price' => $product->price,
+        'weight' => $product->weight,
+        'is_active' => true,
+        'is_featured' => false,
+        'variants' => [
+            ['size' => 'S', 'stock' => 1],
+            ['size' => 'M', 'stock' => 1],
+            ['size' => 'L', 'stock' => 1],
+            ['size' => 'XL', 'stock' => 1],
+        ],
+    ])->assertRedirect(route('admin.products.index'));
+
+    expect($product->fresh()->variants->pluck('size')->all())->toBe(['S', 'M', 'L', 'XL']);
+
+    $this->get(route('shop.show', $product->slug))
+        ->assertInertia(fn ($page) => $page
+            ->where('product.variants.0.size', 'S')
+            ->where('product.variants.1.size', 'M')
+            ->where('product.variants.2.size', 'L')
+            ->where('product.variants.3.size', 'XL'));
+});
+
 it('saves an empty variant stock as zero and shows the product as sold out', function () {
     $admin = User::factory()->create();
     $admin->forceFill(['is_admin' => true])->save();

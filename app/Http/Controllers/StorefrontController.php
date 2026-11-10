@@ -38,7 +38,6 @@ class StorefrontController extends Controller
             'canonicalUrl' => route('home'),
         ]);
     }
-    
 
     /** @return list<string> */
     private function settingPaths(string $key): array
@@ -150,8 +149,10 @@ class StorefrontController extends Controller
             'sizes' => ProductVariant::query()
                 ->whereHas('product', fn ($products) => $products->where('is_active', true))
                 ->distinct()
-                ->orderBy('size')
-                ->pluck('size'),
+                ->pluck('size')
+                ->unique()
+                ->sort(fn (string $left, string $right): int => $this->compareSizes($left, $right))
+                ->values(),
             'filters' => $request->only(['q', 'categories', 'type', 'in_stock', 'min', 'max', 'size', 'sort']),
         ]);
     }
@@ -188,5 +189,19 @@ class StorefrontController extends Controller
             'variants' => $product->variants->map(fn ($variant) => ['id' => $variant->id, 'size' => $variant->size, 'stock' => $variant->stock])->all(),
             'stock' => $product->variants->sum('stock'),
         ];
+    }
+
+    private function compareSizes(string $left, string $right): int
+    {
+        $priority = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL', 'ALL SIZE', 'ONE SIZE', 'FREE SIZE'];
+        $leftSize = mb_strtoupper(trim($left));
+        $rightSize = mb_strtoupper(trim($right));
+        $leftRank = array_search($leftSize, $priority, true);
+        $rightRank = array_search($rightSize, $priority, true);
+        $leftRank = $leftRank === false ? count($priority) : $leftRank;
+        $rightRank = $rightRank === false ? count($priority) : $rightRank;
+
+        return [$leftRank, $leftRank === count($priority) ? $leftSize : '']
+            <=> [$rightRank, $rightRank === count($priority) ? $rightSize : ''];
     }
 }
