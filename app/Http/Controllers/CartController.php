@@ -9,6 +9,7 @@ use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\ProductVariant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -148,6 +149,10 @@ class CartController extends Controller
     /** @return array<int, array<string, mixed>> */
     private function cartItems(User $user): array
     {
+        $user->cartItems()
+            ->whereHas('variant.product', fn (Builder $products) => $products->where('is_active', false))
+            ->delete();
+
         return $user->cartItems()->with('variant.product.images', 'variant.product.category')->get()
             ->map(fn (CartItem $item): array => $this->cartItemData($item))->all();
     }

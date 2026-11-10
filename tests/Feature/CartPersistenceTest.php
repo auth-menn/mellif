@@ -61,6 +61,23 @@ it('stores and updates authenticated cart items while validating current stock',
     $this->getJson(route('cart.index'))->assertOk()->assertJsonPath('items.0.quantity', 2);
 });
 
+it('removes inactive products from the saved cart returned to cart and checkout', function () {
+    $user = User::factory()->create();
+    $variant = createCartVariant();
+    $cartItem = CartItem::query()->create([
+        'user_id' => $user->id,
+        'product_variant_id' => $variant->id,
+        'quantity' => 2,
+    ]);
+    $variant->product->update(['is_active' => false]);
+
+    $this->actingAs($user)->getJson(route('cart.index'))
+        ->assertOk()
+        ->assertJsonCount(0, 'items');
+
+    $this->assertDatabaseMissing('cart_items', ['id' => $cartItem->id]);
+});
+
 it('rejects adding more than the remaining stock to an existing cart item', function () {
     $user = User::factory()->create();
     $variant = createCartVariant(4);
