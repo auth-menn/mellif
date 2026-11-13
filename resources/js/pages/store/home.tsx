@@ -32,7 +32,9 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
     const carouselFrameRef = useRef<HTMLDivElement>(null);
     const dragState = useRef<number | null>(null);
     const suppressSlideClick = useRef(false);
+    const ignoredPointer = useRef(false);
     const pendingDirection = useRef<-1 | 1 | null>(null);
+    const transitionFallback = useRef<number | null>(null);
     const slides = productSlides;
     const firstSlide = slides[0];
     const [activeSlide, setActiveSlide] = useState(0);
@@ -51,6 +53,11 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
 
         if (direction === null) {
             return;
+        }
+
+        if (transitionFallback.current !== null) {
+            window.clearTimeout(transitionFallback.current);
+            transitionFallback.current = null;
         }
 
         pendingDirection.current = null;
@@ -84,7 +91,18 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
                 carouselFrameRef.current?.style.setProperty('--drag-offset', `${direction === 1 ? -frameWidth : frameWidth}px`);
             }
         });
-    }, [slides.length]);
+        transitionFallback.current = window.setTimeout(() => {
+            if (pendingDirection.current === direction) {
+                completeTransition();
+            }
+        }, 700);
+    }, [completeTransition, slides.length]);
+
+    useEffect(() => () => {
+        if (transitionFallback.current !== null) {
+            window.clearTimeout(transitionFallback.current);
+        }
+    }, []);
 
     useEffect(() => {
         const frame = heroFrameRef.current;
@@ -283,8 +301,11 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
                             }
 
                             if (pendingDirection.current !== null) {
-                                completeTransition();
-                                event.currentTarget.style.setProperty('--drag-offset', '0px');
+                                ignoredPointer.current = true;
+                                suppressSlideClick.current = true;
+                                event.currentTarget.setPointerCapture(event.pointerId);
+
+                                return;
                             }
 
                             dragState.current = event.clientX;
@@ -331,6 +352,15 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
                             }
                         }}
                         onPointerUp={(event) => {
+                            if (ignoredPointer.current) {
+                                ignoredPointer.current = false;
+                                window.setTimeout(() => {
+                                    suppressSlideClick.current = false;
+                                }, 0);
+
+                                return;
+                            }
+
                             const startX = dragState.current;
                             dragState.current = null;
                             setIsDragging(false);
@@ -354,6 +384,13 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
                             }
                         }}
                         onPointerCancel={(event) => {
+                            if (ignoredPointer.current) {
+                                ignoredPointer.current = false;
+                                suppressSlideClick.current = false;
+
+                                return;
+                            }
+
                             dragState.current = null;
                             setIsDragging(false);
                             event.currentTarget.style.setProperty('--drag-offset', '0px');
