@@ -4,7 +4,7 @@ deployment:
     - export REPO=/home/eontforr/repositories/mellif
     - export DEPLOYPATH=/home/eontforr/public_html
     - export PHP=/opt/cpanel/ea-php83/root/usr/bin/php
-    - /bin/rsync -av --exclude='index.php' --exclude='.htaccess' --exclude='cgi-bin' --exclude='storage' $REPO/public/ $DEPLOYPATH/
+    - /bin/rsync -av --exclude='index.php' --exclude='cgi-bin' --exclude='storage' $REPO/public/ $DEPLOYPATH/
     - cd $REPO && $PHP artisan config:cache
     - cd $REPO && $PHP artisan route:cache
     - cd $REPO && $PHP artisan view:cache
