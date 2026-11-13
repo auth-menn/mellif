@@ -34,7 +34,7 @@ class StorefrontController extends Controller
         return Inertia::render('store/home', [
             'seo' => [
                 'title' => 'Mellif Studio',
-                'description' => 'Jelajahi produk dan koleksi terbaru dari Mellif Studio melalui toko online resmi kami.',
+                'description' => 'Jelajahi rilisan Mellif Studio: pilihan penuh karakter untuk menemani cerita dan gaya setiap harimu.',
             ],
             'heroImageUrl' => $image ? asset('storage/'.$image) : null,
             'heroVideos' => $heroVideos,
@@ -85,7 +85,7 @@ class StorefrontController extends Controller
             'canonicalUrl' => route('about'),
             'seo' => [
                 'title' => 'Tentang Kami | Mellif Studio',
-                'description' => 'Kenali Mellif Studio, brand fashion wanita dengan koleksi pilihan untuk menemani gaya sehari-hari.',
+                'description' => 'Berkenalan dengan Mellif Studio, label lokal yang merangkai karakter, kenyamanan, dan detail kecil menjadi gaya yang terasa personal.',
             ],
         ]);
     }
@@ -152,8 +152,8 @@ class StorefrontController extends Controller
         return Inertia::render('store/shop', [
             'canonicalUrl' => route('shop.index'),
             'seo' => [
-                'title' => 'Belanja Fashion Wanita | Mellif Studio',
-                'description' => 'Temukan dan belanja koleksi fashion wanita terbaru dari Mellif Studio. Pilih produk, ukuran, dan gaya favorit Anda.',
+                'title' => 'Temukan Gaya Khasmu | Mellif Studio',
+                'description' => 'Temukan pilihan dari Mellif Studio: detail berkarakter, siluet nyaman, dan sentuhan yang membuat gayamu terasa milik sendiri.',
             ],
             'products' => $query->paginate(9)->withQueryString()->through(fn (Product $product) => $this->productData($product)),
             'priceRange' => [

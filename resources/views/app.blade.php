@@ -40,9 +40,9 @@
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         <x-inertia::head>
             <title>{{ $page['props']['seo']['title'] ?? config('app.name', 'Mellif Studio') }}</title>
-            <meta data-inertia="description" name="description" content="{{ $page['props']['seo']['description'] ?? 'Jelajahi koleksi fashion wanita terbaru dari Mellif Studio melalui toko online resmi kami.' }}">
+            <meta data-inertia="description" name="description" content="{{ $page['props']['seo']['description'] ?? 'Jelajahi rilisan Mellif Studio: pilihan penuh karakter untuk menemani cerita dan gaya setiap harimu.' }}">
             <meta data-inertia="og:title" property="og:title" content="{{ $page['props']['seo']['title'] ?? config('app.name', 'Mellif Studio') }}">
-            <meta data-inertia="og:description" property="og:description" content="{{ $page['props']['seo']['description'] ?? 'Jelajahi koleksi fashion wanita terbaru dari Mellif Studio melalui toko online resmi kami.' }}">
+            <meta data-inertia="og:description" property="og:description" content="{{ $page['props']['seo']['description'] ?? 'Jelajahi rilisan Mellif Studio: pilihan penuh karakter untuk menemani cerita dan gaya setiap harimu.' }}">
             @if (! empty($page['props']['canonicalUrl']))
                 <link data-inertia="canonical" rel="canonical" href="{{ $page['props']['canonicalUrl'] }}">
             @endif
