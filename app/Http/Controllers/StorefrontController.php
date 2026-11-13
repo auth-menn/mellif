@@ -32,6 +32,10 @@ class StorefrontController extends Controller
             ->values();
 
         return Inertia::render('store/home', [
+            'seo' => [
+                'title' => 'Mellif Studio | Toko Fashion Wanita',
+                'description' => 'Jelajahi produk dan koleksi terbaru dari Mellif Studio melalui toko online resmi kami.',
+            ],
             'heroImageUrl' => $image ? asset('storage/'.$image) : null,
             'heroVideos' => $heroVideos,
             'productSlides' => $page2Images,
@@ -77,7 +81,13 @@ class StorefrontController extends Controller
 
     public function about(): Response
     {
-        return Inertia::render('store/about');
+        return Inertia::render('store/about', [
+            'canonicalUrl' => route('about'),
+            'seo' => [
+                'title' => 'Tentang Kami | Mellif Studio',
+                'description' => 'Kenali Mellif Studio, brand fashion wanita dengan koleksi pilihan untuk menemani gaya sehari-hari.',
+            ],
+        ]);
     }
 
     public function shop(Request $request): Response|RedirectResponse
@@ -140,6 +150,11 @@ class StorefrontController extends Controller
         };
 
         return Inertia::render('store/shop', [
+            'canonicalUrl' => route('shop.index'),
+            'seo' => [
+                'title' => 'Belanja Fashion Wanita | Mellif Studio',
+                'description' => 'Temukan dan belanja koleksi fashion wanita terbaru dari Mellif Studio. Pilih produk, ukuran, dan gaya favorit Anda.',
+            ],
             'products' => $query->paginate(9)->withQueryString()->through(fn (Product $product) => $this->productData($product)),
             'priceRange' => [
                 'min' => (int) (Product::query()->where('is_active', true)->min('price') ?? 0),
@@ -171,6 +186,10 @@ class StorefrontController extends Controller
         }
 
         return Inertia::render('store/product', [
+            'seo' => [
+                'title' => $product->name.' | Mellif Studio',
+                'description' => mb_substr(trim(preg_replace('/\s+/', ' ', strip_tags($product->description)) ?? ''), 0, 160),
+            ],
             'product' => $this->productData($product),
             'recommendations' => $recommendations->map(fn (Product $item) => $this->productData($item)),
             'canonicalUrl' => route('shop.show', ['product' => $product->slug]),
