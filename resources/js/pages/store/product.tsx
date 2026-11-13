@@ -118,11 +118,11 @@ export default function ProductPage({ product, recommendations, canonicalUrl }: 
 
     return <>
         <Head title={pageTitle}>
-            <meta name="description" content={pageDescription} />
-            <link rel="canonical" href={canonicalUrl} />
+            <meta head-key="description" name="description" content={pageDescription} />
+            <link head-key="canonical" rel="canonical" href={canonicalUrl} />
             <meta property="og:type" content="product" />
-            <meta property="og:title" content={pageTitle} />
-            <meta property="og:description" content={pageDescription} />
+            <meta head-key="og:title" property="og:title" content={pageTitle} />
+            <meta head-key="og:description" property="og:description" content={pageDescription} />
             <meta property="og:url" content={canonicalUrl} />
             {product.images[0] && <meta property="og:image" content={product.images[0]} />}
             <meta name="twitter:card" content="summary_large_image" />
