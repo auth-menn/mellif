@@ -33,7 +33,7 @@ class StorefrontController extends Controller
 
         return Inertia::render('store/home', [
             'seo' => [
-                'title' => 'Mellif Studio | Toko Fashion Wanita',
+                'title' => 'Mellif Studio',
                 'description' => 'Jelajahi produk dan koleksi terbaru dari Mellif Studio melalui toko online resmi kami.',
             ],
             'heroImageUrl' => $image ? asset('storage/'.$image) : null,
