@@ -236,12 +236,12 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
     return (
         <>
             <Head title={pageTitle}>
-                <meta name="description" content={pageDescription} />
-                <link rel="canonical" href={canonicalUrl} />
+                <meta head-key="description" name="description" content={pageDescription} />
+                <link head-key="canonical" rel="canonical" href={canonicalUrl} />
                 <meta property="og:type" content="website" />
                 <meta property="og:site_name" content="Mellif Studio" />
-                <meta property="og:title" content={pageTitle} />
-                <meta property="og:description" content={pageDescription} />
+                <meta head-key="og:title" property="og:title" content={pageTitle} />
+                <meta head-key="og:description" property="og:description" content={pageDescription} />
                 <meta property="og:url" content={canonicalUrl} />
                 <script type="application/ld+json">{websiteStructuredData}</script>
             </Head>
