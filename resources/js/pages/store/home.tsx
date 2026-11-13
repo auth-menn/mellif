@@ -230,7 +230,7 @@ export default function Home({ heroVideos, productSlides, canonicalUrl }: { hero
 
         const observer = new IntersectionObserver(([entry]) => {
             setCarouselVisible(entry.isIntersecting);
-        }, { threshold: 0.35 });
+        }, { threshold: 0 });
 
         observer.observe(carousel);
 
