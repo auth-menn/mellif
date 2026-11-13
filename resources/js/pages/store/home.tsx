@@ -238,7 +238,7 @@ export default function Home({ heroImageUrl, heroVideos, productSlides, canonica
     }, []);
 
     useEffect(() => {
-        if (!carouselVisible || isDragging || slides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (!carouselVisible || isDragging || slides.length < 2) {
             return;
         }
 
