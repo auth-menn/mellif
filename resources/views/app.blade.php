@@ -39,7 +39,13 @@
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         <x-inertia::head>
-            <title>{{ config('app.name', 'Laravel') }}</title>
+            <title>{{ $page['props']['seo']['title'] ?? config('app.name', 'Mellif Studio') }}</title>
+            <meta data-inertia="description" name="description" content="{{ $page['props']['seo']['description'] ?? 'Jelajahi koleksi fashion wanita terbaru dari Mellif Studio melalui toko online resmi kami.' }}">
+            <meta data-inertia="og:title" property="og:title" content="{{ $page['props']['seo']['title'] ?? config('app.name', 'Mellif Studio') }}">
+            <meta data-inertia="og:description" property="og:description" content="{{ $page['props']['seo']['description'] ?? 'Jelajahi koleksi fashion wanita terbaru dari Mellif Studio melalui toko online resmi kami.' }}">
+            @if (! empty($page['props']['canonicalUrl']))
+                <link data-inertia="canonical" rel="canonical" href="{{ $page['props']['canonicalUrl'] }}">
+            @endif
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">
